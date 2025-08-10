@@ -37,4 +37,4 @@ out/
 .vscode/
 
 ### 개인 정보 ###
-.env
+/.env
