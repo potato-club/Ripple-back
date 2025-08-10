@@ -43,8 +43,10 @@ public class AuthService {
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new BadCredentialsException("User not found"));
         Long userId = user.getId();
-        long ver = 0L; // TODO: user.getTokenVersion() 필드 추가 후 적용
-        // TODO: 상태 체크 - user.getStatus() == ACTIVE
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw new AccessDeniedException("User not active");
+        }
+        long ver = user.getTokenVersion();
 
         // 새 AT/RT 발급(Provider 신규 메서드 사용)
         String access = jwtTokenProvider.createAccessToken(userId, ver);
@@ -57,7 +59,10 @@ public class AuthService {
         String hash = TokenHash.sha256(refresh);
         refreshTokenService.store(userId, jti, hash, remainMs);
 
-        // 마지막 로그인 시간 갱신은 User 엔티티 확정 후 적용
+        // 마지막 로그인 시간 갱신
+        user.setLastLoginAt(Instant.now());
+        // flush는 트랜잭션 종료 시점에 반영됨
+
         return new LoginResponseDto(access, refresh);
     }
 
@@ -81,7 +86,8 @@ public class AuthService {
 
         // 2) 재사용 탐지
         if (refreshTokenService.isUsed(jti)) {
-            // TODO: user.tokenVersion++ (세션 전체 무효화) - 필드 추가 후 적용
+            // 세션 무효화: tokenVersion 증가
+            userRepository.incrementTokenVersion(userId);
             throw new BadCredentialsException("Detected refresh token reuse");
         }
 
@@ -98,8 +104,12 @@ public class AuthService {
         // 4) 사용자 상태/버전 확인
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BadCredentialsException("User not found"));
-        // TODO: if (user.getStatus() != UserStatus.ACTIVE) -> 403
-        // TODO: if (user.getTokenVersion() != ver) -> 401 (세션 무효)
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw new AccessDeniedException("User not active");
+        }
+        if (user.getTokenVersion() != ver) {
+            throw new BadCredentialsException("Session invalidated");
+        }
 
         // 5) 회전: 새 AT/RT 발급
         String newAccess = jwtTokenProvider.createAccessToken(userId, ver);
