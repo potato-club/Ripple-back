@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
+import java.util.Objects;
 import java.time.Instant;
 import java.util.Date;
 import java.util.UUID;
@@ -33,7 +34,12 @@ public class JwtTokenProvider {
 
     @PostConstruct
     public void init() {
-        this.hmacKey = Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
+        byte[] keyBytes = Objects.requireNonNull(secretKey, "jwt.secret must not be null")
+                .getBytes(StandardCharsets.UTF_8);
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException("jwt.secret must be at least 32 bytes for HS256");
+        }
+        this.hmacKey = Keys.hmacShaKeyFor(keyBytes);
     }
 
     /**
