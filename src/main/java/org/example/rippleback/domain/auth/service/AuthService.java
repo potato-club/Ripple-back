@@ -6,6 +6,7 @@ import org.example.rippleback.domain.auth.dto.LoginResponseDto;
 import org.example.rippleback.domain.auth.dto.TokenRequestDto;
 import org.example.rippleback.domain.auth.dto.TokenResponseDto;
 import org.example.rippleback.domain.user.entity.User;
+import org.example.rippleback.domain.user.entity.UserStatus;
 import org.example.rippleback.domain.user.repository.UserRepository;
 import org.example.rippleback.global.security.JwtTokenProvider;
 import org.example.rippleback.global.security.RefreshTokenService;
@@ -17,9 +18,9 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.Clock;
 
 @Service
 @RequiredArgsConstructor
@@ -39,20 +40,20 @@ public class AuthService {
 
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new BadCredentialsException("User not found"));
-        Long userId = user.getId();
         if (user.getStatus() != UserStatus.ACTIVE) {
             throw new AccessDeniedException("User not active");
         }
+
+        Long userId = user.getId();
         long ver = user.getTokenVersion();
 
         String access = jwtTokenProvider.createAccessToken(userId, ver);
         String refresh = jwtTokenProvider.createRefreshToken(userId, ver, request.deviceId());
 
-        String jti = jwtTokenProvider.getJti(refresh);
-        Instant exp = jwtTokenProvider.getExpiration(refresh);
-        long remainMs = Duration.between(Instant.now(clock), exp).toMillis();
+        var c = jwtTokenProvider.decode(refresh);
+        long remainMs = Duration.between(Instant.now(clock), c.exp()).toMillis();
         String hash = TokenHash.sha256(refresh);
-        refreshTokenService.store(userId, request.deviceId(), jti, hash, remainMs);
+        refreshTokenService.store(userId, request.deviceId(), c.jti(), hash, remainMs);
 
         user.setLastLoginAt(Instant.now(clock));
 
@@ -63,17 +64,18 @@ public class AuthService {
     public TokenResponseDto refresh(TokenRequestDto request) {
         String provided = request.refreshToken();
 
-        if (!jwtTokenProvider.isValid(provided) || !"refresh".equals(jwtTokenProvider.getTyp(provided))) {
+        var c = jwtTokenProvider.decode(provided);
+        if (!"refresh".equals(c.tokenType())) {
             throw new BadCredentialsException("Invalid refresh token");
         }
-        Long userId = jwtTokenProvider.getUserId(provided);
-        long ver = jwtTokenProvider.getVersion(provided);
-        String jti = jwtTokenProvider.getJti(provided);
-        Instant exp = jwtTokenProvider.getExpiration(provided);
-        long remainMs = Duration.between(Instant.now(clock), exp).toMillis();
+
+        Long userId = c.userId();
+        long ver = c.version();
+        String jti = c.jti();
+        long remainMs = Duration.between(Instant.now(clock), c.exp()).toMillis();
         if (remainMs <= 0) throw new BadCredentialsException("Refresh token expired");
 
-        String tokenDevice = jwtTokenProvider.getDeviceId(provided);
+        String tokenDevice = c.deviceId();
         if (tokenDevice == null || !tokenDevice.equals(request.deviceId())) {
             throw new BadCredentialsException("Device mismatch");
         }
@@ -105,30 +107,32 @@ public class AuthService {
         String newRefresh = jwtTokenProvider.createRefreshToken(userId, ver, request.deviceId());
 
         refreshTokenService.markUsed(jti, remainMs);
-        String newJti = jwtTokenProvider.getJti(newRefresh);
-        Instant newExp = jwtTokenProvider.getExpiration(newRefresh);
-        long newRemainMs = Duration.between(Instant.now(clock), newExp).toMillis();
+
+        var nc = jwtTokenProvider.decode(newRefresh);
+        long newRemainMs = Duration.between(Instant.now(clock), nc.exp()).toMillis();
         String newHash = TokenHash.sha256(newRefresh);
-        refreshTokenService.store(userId, request.deviceId(), newJti, newHash, newRemainMs);
+        refreshTokenService.store(userId, request.deviceId(), nc.jti(), newHash, newRemainMs);
 
         return new TokenResponseDto(newAccess, newRefresh);
     }
 
     @Transactional
     public void logout(String accessToken, String deviceId) {
-        if (!jwtTokenProvider.isValid(accessToken) || !"access".equals(jwtTokenProvider.getTyp(accessToken))) {
-            return;
+        try {
+            var c = jwtTokenProvider.decode(accessToken);
+            if (!"access".equals(c.tokenType())) return;
+            refreshTokenService.delete(c.userId(), deviceId);
+        } catch (Exception ignored) {
         }
-        Long userId = jwtTokenProvider.getUserId(accessToken);
-        refreshTokenService.delete(userId, deviceId);
     }
 
     @Transactional
     public void logoutAll(String accessToken) {
-        if (!jwtTokenProvider.isValid(accessToken) || !"access".equals(jwtTokenProvider.getTyp(accessToken))) {
-            return;
+        try {
+            var c = jwtTokenProvider.decode(accessToken);
+            if (!"access".equals(c.tokenType())) return;
+            refreshTokenService.deleteAll(c.userId());
+        } catch (Exception ignored) {
         }
-        Long userId = jwtTokenProvider.getUserId(accessToken);
-        refreshTokenService.deleteAll(userId);
     }
 }
