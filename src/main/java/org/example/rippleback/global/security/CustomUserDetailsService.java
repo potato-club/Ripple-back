@@ -25,9 +25,6 @@ public class CustomUserDetailsService implements UserDetailsService {
                 .orElseThrow(() ->
                         new UsernameNotFoundException("User not found with email: " + email));
 
-        // 필요 시 추가 검증 (예: 탈퇴/정지 여부)
-        // if (user.isDeleted() || user.isBlocked()) { throw new DisabledException("..."); }
-
         return new CustomUserDetails(user);
     }
 }
