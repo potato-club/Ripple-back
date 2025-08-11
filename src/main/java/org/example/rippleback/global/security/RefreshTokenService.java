@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -17,6 +18,7 @@ public class RefreshTokenService {
 
     private static final String RT_KEY_PREFIX = "rt:";
     private static final String RJTI_KEY = "rjti:";
+    private static final String DEVICES_KEY_PREFIX = "rtdev:";
 
     public record RefreshEntry(String jti, String hash) {
     }
@@ -25,14 +27,17 @@ public class RefreshTokenService {
         return RT_KEY_PREFIX + userId + ":" + deviceId;
     }
 
+    private String devicesKey(Long userId) {
+        return DEVICES_KEY_PREFIX + userId;
+    }
 
     public void store(Long userId, String deviceId, String jti, String hash, long ttlMillis) {
         String key = rtKey(userId, deviceId);
         HashOperations<String, String, String> ops = redisTemplate.opsForHash();
         ops.putAll(key, Map.of("jti", jti, "hash", hash));
         redisTemplate.expire(key, Duration.ofMillis(ttlMillis));
+        redisTemplate.opsForSet().add(devicesKey(userId), deviceId);
     }
-
 
     public Optional<RefreshEntry> get(Long userId, String deviceId) {
         String key = rtKey(userId, deviceId);
@@ -43,15 +48,18 @@ public class RefreshTokenService {
         return Optional.of(new RefreshEntry(jti, hash));
     }
 
-
     public void delete(Long userId, String deviceId) {
         redisTemplate.delete(rtKey(userId, deviceId));
+        redisTemplate.opsForSet().remove(devicesKey(userId), deviceId);
     }
 
     public void deleteAll(Long userId) {
-        var conn = redisTemplate.getConnectionFactory().getConnection();
-        var pattern = (RT_KEY_PREFIX + userId + ":*").getBytes();
-        for (var key : conn.keys(pattern)) conn.del(key);
+        String dkey = devicesKey(userId);
+        Set<String> devices = redisTemplate.opsForSet().members(dkey);
+        if (devices != null && !devices.isEmpty()) {
+            devices.forEach(dev -> redisTemplate.delete(rtKey(userId, dev)));
+        }
+        redisTemplate.delete(dkey);
     }
 
     public void markUsed(String jti, long ttlMillis) {
