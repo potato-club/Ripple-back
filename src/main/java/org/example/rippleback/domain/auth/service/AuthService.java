@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.Clock;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +29,7 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenService refreshTokenService;
     private final UserRepository userRepository;
+    private final Clock clock;
 
     @Transactional
     public LoginResponseDto login(LoginRequestDto request) {
@@ -48,11 +50,11 @@ public class AuthService {
 
         String jti = jwtTokenProvider.getJti(refresh);
         Instant exp = jwtTokenProvider.getExpiration(refresh);
-        long remainMs = Duration.between(Instant.now(), exp).toMillis();
+        long remainMs = Duration.between(Instant.now(clock), exp).toMillis();
         String hash = TokenHash.sha256(refresh);
         refreshTokenService.store(userId, request.deviceId(), jti, hash, remainMs);
 
-        user.setLastLoginAt(Instant.now());
+        user.setLastLoginAt(Instant.now(clock));
 
         return new LoginResponseDto(access, refresh);
     }
@@ -68,7 +70,7 @@ public class AuthService {
         long ver = jwtTokenProvider.getVersion(provided);
         String jti = jwtTokenProvider.getJti(provided);
         Instant exp = jwtTokenProvider.getExpiration(provided);
-        long remainMs = Duration.between(Instant.now(), exp).toMillis();
+        long remainMs = Duration.between(Instant.now(clock), exp).toMillis();
         if (remainMs <= 0) throw new BadCredentialsException("Refresh token expired");
 
         String tokenDevice = jwtTokenProvider.getDeviceId(provided);
@@ -105,7 +107,7 @@ public class AuthService {
         refreshTokenService.markUsed(jti, remainMs);
         String newJti = jwtTokenProvider.getJti(newRefresh);
         Instant newExp = jwtTokenProvider.getExpiration(newRefresh);
-        long newRemainMs = Duration.between(Instant.now(), newExp).toMillis();
+        long newRemainMs = Duration.between(Instant.now(clock), newExp).toMillis();
         String newHash = TokenHash.sha256(newRefresh);
         refreshTokenService.store(userId, request.deviceId(), newJti, newHash, newRemainMs);
 

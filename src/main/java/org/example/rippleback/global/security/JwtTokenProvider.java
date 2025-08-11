@@ -15,6 +15,7 @@ import java.time.Instant;
 import java.util.Date;
 import java.util.Objects;
 import java.util.UUID;
+import java.time.Clock;
 
 @Component
 @RequiredArgsConstructor
@@ -29,6 +30,7 @@ public class JwtTokenProvider {
     @Value("${jwt.refresh-token-expiration}")
     private long refreshTokenExpirationMillis;
 
+    private final Clock clock;
     private io.jsonwebtoken.Claims parse(String token) { return Jwts.parserBuilder().setSigningKey(hmacKey).build().parseClaimsJws(token).getBody(); }
     private Key hmacKey;
 
@@ -43,7 +45,7 @@ public class JwtTokenProvider {
     }
 
     public String createAccessToken(Long userId, long tokenVersion) {
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         Instant exp = now.plusMillis(accessTokenExpirationMillis);
         return Jwts.builder()
                 .setSubject(String.valueOf(userId))
@@ -56,7 +58,7 @@ public class JwtTokenProvider {
     }
 
     public String createRefreshToken(Long userId, long tokenVersion, String deviceId) {
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         Instant exp = now.plusMillis(refreshTokenExpirationMillis);
         String jti = UUID.randomUUID().toString();
         return Jwts.builder()
