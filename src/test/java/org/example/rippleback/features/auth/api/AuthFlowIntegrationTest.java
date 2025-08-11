@@ -1,4 +1,4 @@
-package org.example.rippleback.auth;
+package org.example.rippleback.features.auth.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

@@ -1,6 +1,5 @@
-package org.example.rippleback.security;
+package org.example.rippleback.infra.redis;
 
-import org.example.rippleback.infra.redis.RefreshTokenService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
