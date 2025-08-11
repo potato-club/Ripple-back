@@ -44,7 +44,7 @@ public class AuthService {
         long ver = user.getTokenVersion();
 
         String access = jwtTokenProvider.createAccessToken(userId, ver);
-        String refresh = jwtTokenProvider.createRefreshToken(userId, ver);
+        String refresh = jwtTokenProvider.createRefreshToken(userId, ver, request.deviceId());
 
         String jti = jwtTokenProvider.getJti(refresh);
         Instant exp = jwtTokenProvider.getExpiration(refresh);
@@ -71,6 +71,11 @@ public class AuthService {
         long remainMs = Duration.between(Instant.now(), exp).toMillis();
         if (remainMs <= 0) throw new BadCredentialsException("Refresh token expired");
 
+        String tokenDevice = jwtTokenProvider.getDeviceId(provided);
+        if (tokenDevice == null || !tokenDevice.equals(request.deviceId())) {
+            throw new BadCredentialsException("Device mismatch");
+        }
+
         if (refreshTokenService.isUsed(jti)) {
             userRepository.incrementTokenVersion(userId);
             throw new BadCredentialsException("Detected refresh token reuse");
@@ -95,7 +100,7 @@ public class AuthService {
         }
 
         String newAccess = jwtTokenProvider.createAccessToken(userId, ver);
-        String newRefresh = jwtTokenProvider.createRefreshToken(userId, ver);
+        String newRefresh = jwtTokenProvider.createRefreshToken(userId, ver, request.deviceId());
 
         refreshTokenService.markUsed(jti, remainMs);
         String newJti = jwtTokenProvider.getJti(newRefresh);
