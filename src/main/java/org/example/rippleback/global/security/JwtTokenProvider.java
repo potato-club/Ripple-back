@@ -1,6 +1,5 @@
 package org.example.rippleback.global.security;
 
-import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -30,6 +29,7 @@ public class JwtTokenProvider {
     @Value("${jwt.refresh-token-expiration}")
     private long refreshTokenExpirationMillis;
 
+    private io.jsonwebtoken.Claims parse(String token) { return Jwts.parserBuilder().setSigningKey(hmacKey).build().parseClaimsJws(token).getBody(); }
     private Key hmacKey;
 
     @PostConstruct
@@ -70,14 +70,6 @@ public class JwtTokenProvider {
                 .setExpiration(Date.from(exp))
                 .signWith(hmacKey, SignatureAlgorithm.HS256)
                 .compact();
-    }
-
-    private Claims parse(String token) {
-        return Jwts.parserBuilder()
-                .setSigningKey(hmacKey)
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
     }
 
     public Long getUserId(String token) {
