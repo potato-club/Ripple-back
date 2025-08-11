@@ -1,8 +1,8 @@
 package org.example.rippleback.security;
 
 import jakarta.servlet.http.HttpServletRequest;
-import org.example.rippleback.global.security.JwtAuthenticationFilter;
-import org.example.rippleback.global.security.JwtTokenProvider;
+import org.example.rippleback.core.security.jwt.JwtAuthenticationFilter;
+import org.example.rippleback.core.security.jwt.JwtTokenProvider;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.mock.web.MockHttpServletRequest;

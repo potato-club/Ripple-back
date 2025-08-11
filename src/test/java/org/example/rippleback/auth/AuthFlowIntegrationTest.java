@@ -2,9 +2,9 @@ package org.example.rippleback.auth;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.example.rippleback.domain.user.entity.User;
+import org.example.rippleback.features.user.domain.User;
 import org.example.rippleback.domain.user.entity.UserStatus;
-import org.example.rippleback.domain.user.repository.UserRepository;
+import org.example.rippleback.features.user.infra.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
