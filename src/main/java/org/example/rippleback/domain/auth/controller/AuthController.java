@@ -29,13 +29,25 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(HttpServletRequest request) {
+    public ResponseEntity<Void> logout(HttpServletRequest request,
+                                       @RequestHeader("X-Device-Id") String deviceId) {
         String bearer = request.getHeader("Authorization");
         if (bearer == null || !bearer.startsWith("Bearer ")) {
             return ResponseEntity.badRequest().build();
         }
         String accessToken = bearer.substring(7);
-        authService.logout(accessToken);
+        authService.logout(accessToken, deviceId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/logout/all")
+    public ResponseEntity<Void> logoutAll(HttpServletRequest request) {
+        String bearer = request.getHeader("Authorization");
+        if (bearer == null || !bearer.startsWith("Bearer ")) {
+            return ResponseEntity.badRequest().build();
+        }
+        String accessToken = bearer.substring(7);
+        authService.logoutAll(accessToken);
         return ResponseEntity.noContent().build();
     }
 }

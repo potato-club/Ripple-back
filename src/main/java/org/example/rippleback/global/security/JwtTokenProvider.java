@@ -1,6 +1,5 @@
 package org.example.rippleback.global.security;
 
-import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -12,10 +11,11 @@ import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
-import java.util.Objects;
 import java.time.Instant;
 import java.util.Date;
+import java.util.Objects;
 import java.util.UUID;
+import java.time.Clock;
 
 @Component
 @RequiredArgsConstructor
@@ -30,6 +30,8 @@ public class JwtTokenProvider {
     @Value("${jwt.refresh-token-expiration}")
     private long refreshTokenExpirationMillis;
 
+    private final Clock clock;
+    private io.jsonwebtoken.Claims parse(String token) { return Jwts.parserBuilder().setSigningKey(hmacKey).build().parseClaimsJws(token).getBody(); }
     private Key hmacKey;
 
     @PostConstruct
@@ -42,61 +44,8 @@ public class JwtTokenProvider {
         this.hmacKey = Keys.hmacShaKeyFor(keyBytes);
     }
 
-    /**
-     * Access Token 발급
-     */
-    public String createAccessToken(String email) {
-        Date now = new Date();
-        Date expiry = new Date(now.getTime() + accessTokenExpirationMillis);
-
-        return Jwts.builder()
-                .setSubject(email)
-                .setIssuedAt(now)
-                .setExpiration(expiry)
-                .signWith(hmacKey, SignatureAlgorithm.HS256)
-                .compact();
-    }
-
-    /**
-     * Refresh Token 발급 (랜덤 UUID) + Redis 저장
-     */
-    public String createRefreshToken(String email) {
-        String refreshToken = UUID.randomUUID().toString();
-        return refreshToken;
-    }
-
-    /**
-     * Token 유효성 검증
-     */
-    public boolean validateToken(String token) {
-        try {
-            Jwts.parserBuilder()
-                    .setSigningKey(hmacKey)
-                    .build()
-                    .parseClaimsJws(token);
-            return true;
-        } catch (JwtException | IllegalArgumentException e) {
-            return false;
-        }
-    }
-
-    /**
-     * 토큰에서 이메일(Subject) 추출
-     */
-    public String getEmailFromToken(String token) {
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(hmacKey)
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
-        return claims.getSubject();
-    }
-
-    /**
-     * AT: sub=userId, typ=access, ver, iat/exp
-     */
     public String createAccessToken(Long userId, long tokenVersion) {
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         Instant exp = now.plusMillis(accessTokenExpirationMillis);
         return Jwts.builder()
                 .setSubject(String.valueOf(userId))
@@ -108,11 +57,8 @@ public class JwtTokenProvider {
                 .compact();
     }
 
-    /**
-     * RT(JWT): sub=userId, typ=refresh, ver, jti, iat/exp
-     */
-    public String createRefreshToken(Long userId, long tokenVersion) {
-        Instant now = Instant.now();
+    public String createRefreshToken(Long userId, long tokenVersion, String deviceId) {
+        Instant now = Instant.now(clock);
         Instant exp = now.plusMillis(refreshTokenExpirationMillis);
         String jti = UUID.randomUUID().toString();
         return Jwts.builder()
@@ -120,20 +66,12 @@ public class JwtTokenProvider {
                 .claim("typ", "refresh")
                 .claim("ver", tokenVersion)
                 .claim("jti", jti)
-                .setId(jti) // 표준 jti도 함께 설정(옵션)
+                .claim("deviceId", deviceId)
+                .setId(jti)
                 .setIssuedAt(Date.from(now))
                 .setExpiration(Date.from(exp))
                 .signWith(hmacKey, SignatureAlgorithm.HS256)
                 .compact();
-    }
-
-    // ---------- Parser Utilities ----------
-    private Claims parse(String token) {
-        return Jwts.parserBuilder()
-                .setSigningKey(hmacKey)
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
     }
 
     public Long getUserId(String token) {
@@ -155,13 +93,15 @@ public class JwtTokenProvider {
         return v == null ? null : v.toString();
     }
 
+    public String getDeviceId(String token) {
+        var v = parse(token).get("deviceId");
+        return v == null ? null : v.toString();
+    }
+
     public Instant getExpiration(String token) {
         return parse(token).getExpiration().toInstant();
     }
 
-    /**
-     * 신규 명칭의 유효성 체크
-     */
     public boolean isValid(String token) {
         try {
             parse(token);
