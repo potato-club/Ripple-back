@@ -11,11 +11,11 @@ import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Date;
 import java.util.Objects;
 import java.util.UUID;
-import java.time.Clock;
 
 @Component
 @RequiredArgsConstructor
@@ -31,8 +31,11 @@ public class JwtTokenProvider {
     private long refreshTokenExpirationMillis;
 
     private final Clock clock;
-    private io.jsonwebtoken.Claims parse(String token) { return Jwts.parserBuilder().setSigningKey(hmacKey).build().parseClaimsJws(token).getBody(); }
     private Key hmacKey;
+
+    public static record TokenClaims(
+            Long userId, String tokenType, Long version, String jti, String deviceId, Instant exp
+    ) {}
 
     @PostConstruct
     public void init() {
@@ -49,7 +52,7 @@ public class JwtTokenProvider {
         Instant exp = now.plusMillis(accessTokenExpirationMillis);
         return Jwts.builder()
                 .setSubject(String.valueOf(userId))
-                .claim("typ", "access")
+                .claim("token_type", "access")
                 .claim("ver", tokenVersion)
                 .setIssuedAt(Date.from(now))
                 .setExpiration(Date.from(exp))
@@ -60,51 +63,42 @@ public class JwtTokenProvider {
     public String createRefreshToken(Long userId, long tokenVersion, String deviceId) {
         Instant now = Instant.now(clock);
         Instant exp = now.plusMillis(refreshTokenExpirationMillis);
-        String jti = UUID.randomUUID().toString();
         return Jwts.builder()
                 .setSubject(String.valueOf(userId))
-                .claim("typ", "refresh")
+                .claim("token_type", "refresh")
                 .claim("ver", tokenVersion)
-                .claim("jti", jti)
                 .claim("deviceId", deviceId)
-                .setId(jti)
+                .setId(UUID.randomUUID().toString())
                 .setIssuedAt(Date.from(now))
                 .setExpiration(Date.from(exp))
                 .signWith(hmacKey, SignatureAlgorithm.HS256)
                 .compact();
     }
 
-    public Long getUserId(String token) {
-        return Long.valueOf(parse(token).getSubject());
-    }
-
-    public String getTyp(String token) {
-        var v = parse(token).get("typ");
-        return v == null ? null : v.toString();
-    }
-
-    public long getVersion(String token) {
-        var v = parse(token).get("ver");
-        return v == null ? 0L : ((Number) v).longValue();
-    }
-
-    public String getJti(String token) {
-        var v = parse(token).get("jti");
-        return v == null ? null : v.toString();
-    }
-
-    public String getDeviceId(String token) {
-        var v = parse(token).get("deviceId");
-        return v == null ? null : v.toString();
-    }
-
-    public Instant getExpiration(String token) {
-        return parse(token).getExpiration().toInstant();
+    public TokenClaims decode(String token) {
+        var jws = Jwts.parserBuilder()
+                .setSigningKey(hmacKey)
+                .setAllowedClockSkewSeconds(60)
+                .build()
+                .parseClaimsJws(token);
+        var c = jws.getBody();
+        Long userId = Long.valueOf(c.getSubject());
+        String tokenType = (String) c.get("token_type");
+        Long version = c.get("ver", Number.class) == null
+                ? null : c.get("ver", Number.class).longValue();
+        return new TokenClaims(
+                userId,
+                tokenType,
+                version,
+                c.getId(),
+                (String) c.get("deviceId"),
+                c.getExpiration().toInstant()
+        );
     }
 
     public boolean isValid(String token) {
         try {
-            parse(token);
+            decode(token);
             return true;
         } catch (JwtException | IllegalArgumentException e) {
             return false;
