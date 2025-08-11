@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
@@ -13,6 +14,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -26,12 +28,15 @@ class RefreshTokenServiceTest {
 
     @DynamicPropertySource
     static void props(DynamicPropertyRegistry r) {
-        r.add("spring.data.redis.host", () -> redis.getHost());
-        r.add("spring.data.redis.port", () -> redis.getFirstMappedPort());
+        r.add("spring.data.redis.host", redis::getHost);
+        r.add("spring.data.redis.port", redis::getFirstMappedPort);
     }
 
     @Autowired
     RefreshTokenService service;
+
+    @Autowired
+    RedisTemplate<String, String> redisTemplate;
 
     @Test
     void store_get_delete_per_device() {
@@ -49,8 +54,12 @@ class RefreshTokenServiceTest {
         service.delete(uid, dev1);
         assertThat(service.get(uid, dev1)).isEmpty();
         assertThat(service.get(uid, dev2)).isPresent();
+        Set<String> membersAfterDelete = redisTemplate.opsForSet().members("rtdev:" + uid);
+        assertThat(membersAfterDelete).containsExactly("d2");
         service.deleteAll(uid);
         assertThat(service.get(uid, dev2)).isEmpty();
+        Set<String> membersAfterAll = redisTemplate.opsForSet().members("rtdev:" + uid);
+        assertThat(membersAfterAll == null || membersAfterAll.isEmpty()).isTrue();
     }
 
     @Test
