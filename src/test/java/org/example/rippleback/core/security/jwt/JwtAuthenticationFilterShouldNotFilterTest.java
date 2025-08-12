@@ -1,31 +1,25 @@
 package org.example.rippleback.core.security.jwt;
 
-import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.springframework.mock.web.MockHttpServletRequest;
+
+import java.io.IOException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JwtAuthenticationFilterShouldNotFilterTest {
 
-    static class ExposedFilter extends JwtAuthenticationFilter {
-        public ExposedFilter(JwtTokenProvider p) { super(p); }
-        public boolean callShouldNotFilter(HttpServletRequest req) { return super.shouldNotFilter(req); }
-    }
-
     @Test
-    void should_skip_for_auth_paths_and_options() {
-        var provider = Mockito.mock(JwtTokenProvider.class);
-        var filter = new ExposedFilter(provider);
+    void should_skip_login_and_refresh() throws ServletException, IOException {
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(null);
 
-        var req1 = new MockHttpServletRequest("GET", "/api/auth/login");
-        assertThat(filter.callShouldNotFilter(req1)).isTrue();
+        MockHttpServletRequest loginReq = new MockHttpServletRequest("POST", "/api/auth/login");
+        MockHttpServletRequest refreshReq = new MockHttpServletRequest("POST", "/api/auth/refresh");
+        MockHttpServletRequest otherReq = new MockHttpServletRequest("GET", "/api/users/me");
 
-        var req2 = new MockHttpServletRequest("OPTIONS", "/api/secure/me");
-        assertThat(filter.callShouldNotFilter(req2)).isTrue();
-
-        var req3 = new MockHttpServletRequest("GET", "/api/secure/me");
-        assertThat(filter.callShouldNotFilter(req3)).isFalse();
+        assertThat(filter.shouldNotFilter(loginReq)).isTrue();
+        assertThat(filter.shouldNotFilter(refreshReq)).isTrue();
+        assertThat(filter.shouldNotFilter(otherReq)).isFalse();
     }
 }
