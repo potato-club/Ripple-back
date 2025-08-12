@@ -18,7 +18,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 
-import static org.example.rippleback.core.security.jwt.JwtClaims.TOKEN_TYPE;
 import static org.example.rippleback.core.security.jwt.JwtClaims.TOKEN_TYPE_ACCESS;
 
 @Component

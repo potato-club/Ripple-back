@@ -48,7 +48,7 @@ public class AuthService {
         }
 
         User user = userRepository.findByEmail(request.email())
-                .orElseThrow(() -> new InvalidCredentialsException();
+                .orElseThrow(InvalidCredentialsException::new);
         if (user.getStatus() != UserStatus.ACTIVE) {
             throw new UserInactiveException();
         }
@@ -101,7 +101,7 @@ public class AuthService {
         }
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new UserNotFoundException();
+                .orElseThrow(UserNotFoundException::new);
         if (user.getStatus() != UserStatus.ACTIVE) {
             throw new UserInactiveException();
         }
