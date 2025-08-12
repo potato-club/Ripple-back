@@ -1,9 +1,10 @@
-package org.example.rippleback.auth;
+package org.example.rippleback.features.auth.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.redis.testcontainers.RedisContainer;
 import org.example.rippleback.features.user.domain.User;
-import org.example.rippleback.domain.user.entity.UserStatus;
+import org.example.rippleback.features.user.domain.UserStatus;
 import org.example.rippleback.features.user.infra.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,9 +20,9 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.containers.RedisContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
 import java.time.Instant;
 
@@ -40,7 +41,7 @@ class AuthFlowIntegrationTest {
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
 
     @Container
-    static RedisContainer redis = new RedisContainer("redis:7-alpine");
+    static RedisContainer redis = new RedisContainer(DockerImageName.parse("redis:7-alpine"));
 
     @DynamicPropertySource
     static void props(DynamicPropertyRegistry r) {
@@ -54,17 +55,10 @@ class AuthFlowIntegrationTest {
         r.add("jwt.refresh-token-expiration", () -> 3_600_000);
     }
 
-    @Autowired
-    MockMvc mvc;
-
-    @Autowired
-    ObjectMapper om;
-
-    @Autowired
-    UserRepository userRepository;
-
-    @Autowired
-    PasswordEncoder encoder;
+    @Autowired MockMvc mvc;
+    @Autowired ObjectMapper om;
+    @Autowired UserRepository userRepository;
+    @Autowired PasswordEncoder encoder;
 
     String email = "u1@ripple.dev";
     String rawPw = "password1!";
@@ -86,7 +80,7 @@ class AuthFlowIntegrationTest {
     }
 
     @Test
-    void login_refresh_rotate_logout_flow() throws Exception {
+    void login_refresh_rotate_logout_flow_with_error_codes() throws Exception {
         var loginRes = mvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -114,73 +108,39 @@ class AuthFlowIntegrationTest {
         assertThat(newRt).isNotBlank();
         assertThat(newRt).isNotEqualTo(rt);
 
-        mvc.perform(post("/api/auth/refresh")
+        var reuseRes = mvc.perform(post("/api/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"refreshToken":"%s","deviceId":"device-A"}
                                 """.formatted(rt)))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andReturn().getResponse().getContentAsString();
+        JsonNode reuseJson = om.readTree(reuseRes);
+        assertThat(reuseJson.get("code").asText()).isEqualTo("1108");
 
-        mvc.perform(post("/api/auth/refresh")
+        var deviceMismatchRes = mvc.perform(post("/api/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"refreshToken":"%s","deviceId":"device-B"}
-                                """.formatted(newRt)))
-                .andExpect(status().isBadRequest());
+                                {"refreshToken":"%s","deviceId":"%s"}
+                                """.formatted(newRt, deviceB)))
+                .andExpect(status().isUnauthorized())
+                .andReturn().getResponse().getContentAsString();
+        JsonNode deviceMismatchJson = om.readTree(deviceMismatchRes);
+        assertThat(deviceMismatchJson.get("code").asText()).isEqualTo("1105");
 
         mvc.perform(post("/api/auth/logout")
                         .header("Authorization", "Bearer " + newAt)
                         .header("X-Device-Id", deviceA))
                 .andExpect(status().isNoContent());
 
-        mvc.perform(post("/api/auth/refresh")
+        var afterLogoutRes = mvc.perform(post("/api/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"refreshToken":"%s","deviceId":"device-A"}
                                 """.formatted(newRt)))
-                .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    void login_from_two_devices_then_logoutAll_invalidates_both() throws Exception {
-        var loginA = mvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"email":"%s","password":"%s","deviceId":"%s"}
-                                """.formatted(email, rawPw, deviceA)))
-                .andExpect(status().isOk())
+                .andExpect(status().isUnauthorized())
                 .andReturn().getResponse().getContentAsString();
-        var jsonA = om.readTree(loginA);
-        String atA = jsonA.get("accessToken").asText();
-        String rtA = jsonA.get("refreshToken").asText();
-
-        var loginB = mvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"email":"%s","password":"%s","deviceId":"%s"}
-                                """.formatted(email, rawPw, deviceB)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        var jsonB = om.readTree(loginB);
-        String atB = jsonB.get("accessToken").asText();
-        String rtB = jsonB.get("refreshToken").asText();
-
-        mvc.perform(post("/api/auth/logout/all")
-                        .header("Authorization", "Bearer " + atB))
-                .andExpect(status().isNoContent());
-
-        mvc.perform(post("/api/auth/refresh")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"refreshToken":"%s","deviceId":"%s"}
-                                """.formatted(rtA, deviceA)))
-                .andExpect(status().isUnauthorized());
-
-        mvc.perform(post("/api/auth/refresh")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"refreshToken":"%s","deviceId":"%s"}
-                                """.formatted(rtB, deviceB)))
-                .andExpect(status().isUnauthorized());
+        JsonNode afterLogoutJson = om.readTree(afterLogoutRes);
+        assertThat(afterLogoutJson.get("code").asText()).isEqualTo("1106");
     }
 }

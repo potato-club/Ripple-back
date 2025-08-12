@@ -24,48 +24,40 @@ repositories {
 }
 
 dependencies {
-    // spring data jpa
-    implementation 'org.springframework.boot:spring-boot-starter'
-
-    // PostgreSQL
-    runtimeOnly 'org.postgresql:postgresql'
-
-    // lombok
-    compileOnly 'org.projectlombok:lombok'
-    annotationProcessor 'org.projectlombok:lombok'
-
-    // spring web
+    // Web / Security / Validation
     implementation 'org.springframework.boot:spring-boot-starter-web'
-
-    // spring security
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
 
-    // jwt
-    implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
-    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
-    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
+    // Data JPA + PostgreSQL
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    runtimeOnly 'org.postgresql:postgresql'
 
-    // redis
+    // Redis
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.apache.commons:commons-pool2'
 
-    // devtools
+    // JWT
+    implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
+    runtimeOnly  'io.jsonwebtoken:jjwt-impl:0.11.5'
+    runtimeOnly  'io.jsonwebtoken:jjwt-jackson:0.11.5'
+
+    // Lombok & @ConfigurationProperties 메타데이터
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+
+    // Dev
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
 
-    //test
+    // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
-    testImplementation 'org.mockito:mockito-core'
-    testImplementation 'org.mockito:mockito-junit-jupiter'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    // Testcontainers (BOM)
     testImplementation 'org.testcontainers:junit-jupiter:1.20.1'
     testImplementation 'org.testcontainers:postgresql:1.20.1'
-    testImplementation 'org.testcontainers:redis:1.20.1'
-
-    // PostConstruct
-    implementation 'jakarta.annotation:jakarta.annotation-api:2.1.1'
-
+    testImplementation 'com.redis:testcontainers-redis:2.2.4'
 }
 
 tasks.named('test') {

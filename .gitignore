@@ -1,39 +1,60 @@
-.gradle
-build/
+# Gradle
+.gradle/
+**/build/
 !gradle/wrapper/gradle-wrapper.jar
-!**/src/main/**/build/
-!**/src/test/**/build/
 
-### STS ###
-.apt_generated
+# Java outputs
+*.class
+*.jar
+*.war
+*.ear
+
+# IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+bin/
+
+# Eclipse / STS
+.apt_generated/
 .classpath
 .factorypath
 .project
-.settings
+.settings/
 .springBeans
 .sts4-cache
-bin/
-!**/src/main/**/bin/
-!**/src/test/**/bin/
 
-### IntelliJ IDEA ###
-.idea
-*.iws
-*.iml
-*.ipr
-out/
-!**/src/main/**/out/
-!**/src/test/**/out/
-
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-
-### VS Code ###
+# VS Code
 .vscode/
 
-### 개인 정보 ###
-/.env
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Logs & dumps
+logs/
+*.log
+spring.log
+hs_err_pid*
+replay_pid*
+
+# Env / secrets
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
+
+# Docker (optional overrides, local envs)
+docker-compose.override.yml
+docker/*.env
+
+# Testcontainers (keep local-only settings out of VCS)
+.testcontainers.properties
+
+# Maven (if someone accidentally builds with Maven)
+target/
