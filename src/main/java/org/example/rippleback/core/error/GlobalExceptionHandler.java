@@ -6,6 +6,8 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 
 import static org.example.rippleback.core.error.ErrorCode.*;
 
@@ -41,6 +43,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(Exception e) {
         var ec = INTERNAL_SERVER_ERROR;
+        return ResponseEntity.status(ec.httpStatus()).body(ErrorResponse.of(ec));
+    }
+
+    @ExceptionHandler({ MissingServletRequestParameterException.class, MissingRequestHeaderException.class })
+    public ResponseEntity<ErrorResponse> handleMissing(Exception e) {
+        var ec = COMMON_VALIDATION_ERROR;
         return ResponseEntity.status(ec.httpStatus()).body(ErrorResponse.of(ec));
     }
 }
