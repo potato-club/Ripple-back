@@ -1,8 +1,6 @@
 package org.example.rippleback.core.config;
 
 import lombok.RequiredArgsConstructor;
-import org.example.rippleback.core.error.BusinessException;
-import org.example.rippleback.core.error.ErrorCode;
 import org.example.rippleback.core.security.jwt.JwtAuthenticationFilter;
 import org.example.rippleback.core.security.jwt.JwtTokenProvider;
 import org.example.rippleback.features.user.app.CustomUserDetailsService;
@@ -37,6 +35,9 @@ public class SecurityConfig {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final CustomUserDetailsService customUserDetailsService;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final JsonAuthenticationEntryPoint authEntryPoint;
+    private final JsonAccessDeniedHandler accessDeniedHandler;
 
     @Value("${app.cors.allowed-origins:*}") private String corsAllowedOrigins;
     @Value("${app.cors.allowed-methods:GET,POST,PUT,PATCH,DELETE,OPTIONS}") private String corsAllowedMethods;
@@ -51,48 +52,15 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint((req, res, e) -> {
-                            Object attr = req.getAttribute("auth_error");
-                            if (attr instanceof BusinessException be) {
-                                var ec = be.errorCode();
-                                res.setStatus(ec.httpStatus().value());
-                                res.setContentType("application/json");
-                                res.setCharacterEncoding("UTF-8");
-                                res.getWriter().write(
-                                        """
-                                        {"status":%d,"code":"%s","message":"%s"}
-                                        """.formatted(ec.httpStatus().value(), ec.code(), ec.message())
-                                );
-                                return;
-                            }
-                            var ec = ErrorCode.COMMON_UNAUTHORIZED;
-                            res.setStatus(ec.httpStatus().value());
-                            res.setContentType("application/json");
-                            res.setCharacterEncoding("UTF-8");
-                            res.getWriter().write(
-                                    """
-                                    {"status":%d,"code":"%s","message":"%s"}
-                                    """.formatted(ec.httpStatus().value(), ec.code(), ec.message())
-                            );
-                        })
-                        .accessDeniedHandler((req, res, e) -> {
-                            var ec = ErrorCode.COMMON_FORBIDDEN;
-                            res.setStatus(ec.httpStatus().value());
-                            res.setContentType("application/json");
-                            res.setCharacterEncoding("UTF-8");
-                            res.getWriter().write(
-                                    """
-                                    {"status":%d,"code":"%s","message":"%s"}
-                                    """.formatted(ec.httpStatus().value(), ec.code(), ec.message())
-                            );
-                        })
+                        .authenticationEntryPoint(authEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler)
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/refresh").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/logout", "/api/auth/logout/all").authenticated()
                         .anyRequest().authenticated()
                 )
-                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider), UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
