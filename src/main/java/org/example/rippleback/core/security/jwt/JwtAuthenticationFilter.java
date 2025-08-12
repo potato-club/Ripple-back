@@ -11,12 +11,16 @@ import org.example.rippleback.core.error.exceptions.auth.TokenTypeInvalidExcepti
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 
+import static org.example.rippleback.core.security.jwt.JwtClaims.TOKEN_TYPE_ACCESS;
+
+@Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
@@ -38,7 +42,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (token != null) {
             try {
                 var c = jwtTokenProvider.decode(token);
-                if ("access".equals(c.tokenType())) {
+                if (TOKEN_TYPE_ACCESS.equals(c.tokenType())) {
                     var principal = new JwtPrincipal(c.userId());
                     var auth = new UsernamePasswordAuthenticationToken(
                             principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER")));
