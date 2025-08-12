@@ -1,13 +1,15 @@
 package org.example.rippleback.core.config;
 
-import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.example.rippleback.features.user.app.CustomUserDetailsService;
+import org.example.rippleback.core.error.BusinessException;
+import org.example.rippleback.core.error.ErrorCode;
 import org.example.rippleback.core.security.jwt.JwtAuthenticationFilter;
 import org.example.rippleback.core.security.jwt.JwtTokenProvider;
+import org.example.rippleback.features.user.app.CustomUserDetailsService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -36,100 +38,88 @@ public class SecurityConfig {
     private final JwtTokenProvider jwtTokenProvider;
     private final CustomUserDetailsService customUserDetailsService;
 
-    @Value("${app.cors.allowed-origins:*}")
-    private String corsAllowedOrigins;
-
-    @Value("${app.cors.allowed-methods:GET,POST,PUT,PATCH,DELETE,OPTIONS}")
-    private String corsAllowedMethods;
-
-    @Value("${app.cors.allowed-headers:Authorization,Content-Type,X-Device-Id}")
-    private String corsAllowedHeaders;
-
-    @Value("${app.cors.exposed-headers:Authorization}")
-    private String corsExposedHeaders;
-
-    @Value("${app.cors.allow-credentials:true}")
-    private boolean corsAllowCredentials;
+    @Value("${app.cors.allowed-origins:*}") private String corsAllowedOrigins;
+    @Value("${app.cors.allowed-methods:GET,POST,PUT,PATCH,DELETE,OPTIONS}") private String corsAllowedMethods;
+    @Value("${app.cors.allowed-headers:Authorization,Content-Type,X-Device-Id}") private String corsAllowedHeaders;
+    @Value("${app.cors.exposed-headers:Authorization}") private String corsExposedHeaders;
+    @Value("${app.cors.allow-credentials:true}") private boolean corsAllowCredentials;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                )
+                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((req, res, e) -> {
-                            res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            Object attr = req.getAttribute("auth_error");
+                            if (attr instanceof BusinessException be) {
+                                var ec = be.errorCode();
+                                res.setStatus(ec.httpStatus().value());
+                                res.setContentType("application/json");
+                                res.setCharacterEncoding("UTF-8");
+                                res.getWriter().write(
+                                        """
+                                        {"status":%d,"code":"%s","message":"%s"}
+                                        """.formatted(ec.httpStatus().value(), ec.code(), ec.message())
+                                );
+                                return;
+                            }
+                            var ec = ErrorCode.COMMON_UNAUTHORIZED;
+                            res.setStatus(ec.httpStatus().value());
                             res.setContentType("application/json");
-                            res.getWriter().write("{\"code\":\"AUTH_401\",\"message\":\"Unauthorized\"}");
+                            res.setCharacterEncoding("UTF-8");
+                            res.getWriter().write(
+                                    """
+                                    {"status":%d,"code":"%s","message":"%s"}
+                                    """.formatted(ec.httpStatus().value(), ec.code(), ec.message())
+                            );
                         })
                         .accessDeniedHandler((req, res, e) -> {
-                            res.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                            var ec = ErrorCode.COMMON_FORBIDDEN;
+                            res.setStatus(ec.httpStatus().value());
                             res.setContentType("application/json");
-                            res.getWriter().write("{\"code\":\"AUTH_403\",\"message\":\"Forbidden\"}");
+                            res.setCharacterEncoding("UTF-8");
+                            res.getWriter().write(
+                                    """
+                                    {"status":%d,"code":"%s","message":"%s"}
+                                    """.formatted(ec.httpStatus().value(), ec.code(), ec.message())
+                            );
                         })
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll()  // 로그인, 회원가입 등은 허용
+                        .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/refresh").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/logout", "/api/auth/logout/all").authenticated()
                         .anyRequest().authenticated()
                 )
-                .addFilterBefore(
-                        new JwtAuthenticationFilter(jwtTokenProvider),
-                        UsernamePasswordAuthenticationFilter.class
-                );
+                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
-
-    @Bean
-    public AuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
+    @Bean public PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
+    @Bean public AuthenticationProvider authenticationProvider() {
+        var provider = new DaoAuthenticationProvider();
         provider.setUserDetailsService(customUserDetailsService);
         provider.setPasswordEncoder(passwordEncoder());
         return provider;
     }
-
-    @Bean
-    public AuthenticationManager authenticationManager(
-            AuthenticationConfiguration configuration) throws Exception {
-        return configuration.getAuthenticationManager();
-    }
-
-
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration config = new CorsConfiguration();
+    @Bean public AuthenticationManager authenticationManager(AuthenticationConfiguration c) throws Exception { return c.getAuthenticationManager(); }
+    @Bean public CorsConfigurationSource corsConfigurationSource() {
+        var config = new CorsConfiguration();
         config.setAllowCredentials(corsAllowCredentials);
-        List<String> origins = split(corsAllowedOrigins);
-        if (origins.size() == 1 && "*".equals(origins.get(0))) {
-            config.setAllowedOriginPatterns(List.of("*"));
-        } else {
-            config.setAllowedOrigins(origins);
-        }
+        var origins = split(corsAllowedOrigins);
+        if (origins.size() == 1 && "*".equals(origins.get(0))) config.setAllowedOriginPatterns(List.of("*"));
+        else config.setAllowedOrigins(origins);
         config.setAllowedMethods(split(corsAllowedMethods));
         config.setAllowedHeaders(split(corsAllowedHeaders));
         config.setExposedHeaders(split(corsExposedHeaders));
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        var source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;
     }
-
-    @Bean
-    public Clock clock() {
-        return Clock.systemUTC();
-    }
-
+    @Bean public Clock clock() { return Clock.systemUTC(); }
     private static List<String> split(String csv) {
-        return Arrays.stream(csv.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .collect(Collectors.toList());
+        return Arrays.stream(csv.split(",")).map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList());
     }
 }

@@ -1,37 +1,46 @@
 package org.example.rippleback.core.error;
 
-import org.springframework.http.HttpStatus;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.util.Map;
+import static org.example.rippleback.core.error.ErrorCode.*;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(BadCredentialsException.class)
-    public ResponseEntity<Map<String, Object>> handleBadCredentials(BadCredentialsException ex) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(Map.of("code", "AUTH_401", "message", ex.getMessage()));
-    }
-
-    @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException ex) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(Map.of("code", "AUTH_403", "message", ex.getMessage()));
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ErrorResponse> handleBusiness(BusinessException e) {
+        var ec = e.errorCode();
+        return ResponseEntity.status(ec.httpStatus())
+                .body(ErrorResponse.of(ec));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException ex) {
-        String msg = ex.getBindingResult().getFieldErrors().stream()
-                .findFirst()
-                .map(e -> e.getField() + " " + e.getDefaultMessage())
-                .orElse("Invalid request");
-        return ResponseEntity.badRequest()
-                .body(Map.of("code", "AUTH_400", "message", msg));
+    public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException e) {
+        var ec = COMMON_VALIDATION_ERROR;
+        return ResponseEntity.status(ec.httpStatus())
+                .body(ErrorResponse.of(ec));
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException e) {
+        var ec = COMMON_FORBIDDEN;
+        return ResponseEntity.status(ec.httpStatus()).body(ErrorResponse.of(ec));
+    }
+
+    @ExceptionHandler(DataAccessException.class)
+    public ResponseEntity<ErrorResponse> handleData(DataAccessException e) {
+        var ec = INFRA_DB_ERROR;
+        return ResponseEntity.status(ec.httpStatus()).body(ErrorResponse.of(ec));
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponse> handleUnexpected(Exception e) {
+        var ec = INTERNAL_SERVER_ERROR;
+        return ResponseEntity.status(ec.httpStatus()).body(ErrorResponse.of(ec));
     }
 }

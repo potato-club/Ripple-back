@@ -1,11 +1,13 @@
 package org.example.rippleback.core.security.jwt;
 
-import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.example.rippleback.core.error.exceptions.auth.TokenExpiredException;
+import org.example.rippleback.core.error.exceptions.auth.TokenInvalidException;
+import org.example.rippleback.core.error.exceptions.auth.TokenTypeInvalidException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -13,17 +15,18 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private static final Set<String> SKIP_PATHS = Set.of("/api/auth/login", "/api/auth/refresh");
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        String path = request.getServletPath();
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) return true;
-        return path.startsWith("/api/auth/");
+        return SKIP_PATHS.contains(request.getServletPath());
     }
 
     @Override
@@ -36,11 +39,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             try {
                 var c = jwtTokenProvider.decode(token);
                 if ("access".equals(c.tokenType())) {
+                    var principal = new JwtPrincipal(c.userId());
                     var auth = new UsernamePasswordAuthenticationToken(
-                            c.userId(), null, List.of(new SimpleGrantedAuthority("ROLE_USER")));
+                            principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER")));
                     SecurityContextHolder.getContext().setAuthentication(auth);
+                } else {
+                    request.setAttribute("auth_error", new TokenTypeInvalidException());
                 }
-            } catch (JwtException | IllegalArgumentException ignored) {
+            } catch (io.jsonwebtoken.ExpiredJwtException e) {
+                request.setAttribute("auth_error", new TokenExpiredException());
+            } catch (io.jsonwebtoken.JwtException | IllegalArgumentException e) {
+                request.setAttribute("auth_error", new TokenInvalidException());
             }
         }
         filterChain.doFilter(request, response);

@@ -1,22 +1,27 @@
 package org.example.rippleback.features.auth.app;
 
 import lombok.RequiredArgsConstructor;
+import org.example.rippleback.core.error.exceptions.auth.*;
+import org.example.rippleback.core.error.exceptions.user.UserInactiveException;
+import org.example.rippleback.core.error.exceptions.user.UserNotFoundException;
 import org.example.rippleback.features.auth.api.dto.LoginRequestDto;
 import org.example.rippleback.features.auth.api.dto.LoginResponseDto;
 import org.example.rippleback.features.auth.api.dto.TokenRequestDto;
 import org.example.rippleback.features.auth.api.dto.TokenResponseDto;
 import org.example.rippleback.features.user.domain.User;
-import org.example.rippleback.domain.user.entity.UserStatus;
+import org.example.rippleback.features.user.domain.UserStatus;
 import org.example.rippleback.features.user.infra.UserRepository;
 import org.example.rippleback.core.security.jwt.JwtTokenProvider;
 import org.example.rippleback.infra.redis.RefreshTokenService;
 import org.example.rippleback.core.security.jwt.TokenHash;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -34,14 +39,18 @@ public class AuthService {
 
     @Transactional
     public LoginResponseDto login(LoginRequestDto request) {
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.email(), request.password())
-        );
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.email(), request.password())
+            );
+        } catch (BadCredentialsException e) {
+            throw new InvalidCredentialsException();
+        }
 
         User user = userRepository.findByEmail(request.email())
-                .orElseThrow(() -> new BadCredentialsException("User not found"));
+                .orElseThrow(() -> new InvalidCredentialsException();
         if (user.getStatus() != UserStatus.ACTIVE) {
-            throw new AccessDeniedException("User not active");
+            throw new UserInactiveException();
         }
 
         Long userId = user.getId();
@@ -64,43 +73,40 @@ public class AuthService {
     public TokenResponseDto refresh(TokenRequestDto request) {
         String provided = request.refreshToken();
 
-        var c = jwtTokenProvider.decode(provided);
-        if (!"refresh".equals(c.tokenType())) {
-            throw new BadCredentialsException("Invalid refresh token");
-        }
+        var c = decodeRefreshOrThrow(provided);
 
         Long userId = c.userId();
         long ver = c.version();
         String jti = c.jti();
         long remainMs = Duration.between(Instant.now(clock), c.exp()).toMillis();
-        if (remainMs <= 0) throw new BadCredentialsException("Refresh token expired");
+        if (remainMs <= 0) throw new TokenExpiredException();
 
         String tokenDevice = c.deviceId();
         if (tokenDevice == null || !tokenDevice.equals(request.deviceId())) {
-            throw new BadCredentialsException("Device mismatch");
+            throw new DeviceMismatchException();
         }
 
         if (refreshTokenService.isUsed(jti)) {
             userRepository.incrementTokenVersion(userId);
-            throw new BadCredentialsException("Detected refresh token reuse");
+            throw new RefreshReusedException();
         }
 
         String hash = TokenHash.sha256(provided);
         var entryOpt = refreshTokenService.get(userId, request.deviceId());
-        if (entryOpt.isEmpty()) throw new BadCredentialsException("Refresh token not found");
+        if (entryOpt.isEmpty()) throw new RefreshNotFoundException();
         var entry = entryOpt.get();
         if (!entry.jti().equals(jti) || !entry.hash().equals(hash)) {
             refreshTokenService.delete(userId, request.deviceId());
-            throw new BadCredentialsException("Refresh token mismatch");
+            throw new RefreshMismatchException();
         }
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new BadCredentialsException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException();
         if (user.getStatus() != UserStatus.ACTIVE) {
-            throw new AccessDeniedException("User not active");
+            throw new UserInactiveException();
         }
         if (user.getTokenVersion() != ver) {
-            throw new BadCredentialsException("Session invalidated");
+            throw new SessionInvalidatedException();
         }
 
         String newAccess = jwtTokenProvider.createAccessToken(userId, ver);
@@ -117,22 +123,26 @@ public class AuthService {
     }
 
     @Transactional
-    public void logout(String accessToken, String deviceId) {
-        try {
-            var c = jwtTokenProvider.decode(accessToken);
-            if (!"access".equals(c.tokenType())) return;
-            refreshTokenService.delete(c.userId(), deviceId);
-        } catch (Exception ignored) {
-        }
+    public void logout(Long userId, String deviceId) {
+        refreshTokenService.delete(userId, deviceId);
     }
 
     @Transactional
-    public void logoutAll(String accessToken) {
+    public void logoutAll(Long userId) {
+        refreshTokenService.deleteAll(userId);
+    }
+
+    private JwtTokenProvider.TokenClaims decodeRefreshOrThrow(String token) {
         try {
-            var c = jwtTokenProvider.decode(accessToken);
-            if (!"access".equals(c.tokenType())) return;
-            refreshTokenService.deleteAll(c.userId());
-        } catch (Exception ignored) {
+            var c = jwtTokenProvider.decode(token);
+            if (!"refresh".equals(c.tokenType())) {
+                throw new TokenTypeInvalidException();
+            }
+            return c;
+        } catch (ExpiredJwtException e) {
+            throw new TokenExpiredException();
+        } catch (JwtException | IllegalArgumentException e) {
+            throw new TokenInvalidException();
         }
     }
 }
