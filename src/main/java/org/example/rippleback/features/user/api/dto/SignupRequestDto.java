@@ -1,27 +1,14 @@
 package org.example.rippleback.features.user.api.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import org.example.rippleback.features.user.domain.User;
+import jakarta.validation.constraints.*;
 
-@Getter
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-
-public class SignupRequestDto {
-
-    private String username;
-    private String password;
-    private String email;
-
-    public User SignupToUser() {
-        return User.builder()
-                .username(username)
-                .email(email)
-                .password(password)
-                .build();
-    }
-}
+public record SignupRequestDto(
+        @NotBlank @Pattern(regexp = "^[a-zA-Z0-9_]{3,20}$", message = "영문/숫자/밑줄 3~20자")
+        String username,
+        @NotBlank @Email
+        String email,
+        @NotBlank @Size(min = 8, max = 72)
+        String password,
+        @NotBlank @Size(min = 6, max = 6)
+        String emailCode
+) {}
