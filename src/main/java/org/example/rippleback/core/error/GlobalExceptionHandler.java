@@ -36,7 +36,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DataAccessException.class)
     public ResponseEntity<ErrorResponse> handleData(DataAccessException e) {
-        var ec = INFRA_DB_ERROR;
+        var ec = DB_ERROR;
         return ResponseEntity.status(ec.httpStatus()).body(ErrorResponse.of(ec));
     }
 
