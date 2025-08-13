@@ -23,14 +23,14 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException e) {
-        var ec = COMMON_VALIDATION_ERROR;
+        var ec = VALIDATION_ERROR;
         return ResponseEntity.status(ec.httpStatus())
                 .body(ErrorResponse.of(ec));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException e) {
-        var ec = COMMON_FORBIDDEN;
+        var ec = FORBIDDEN;
         return ResponseEntity.status(ec.httpStatus()).body(ErrorResponse.of(ec));
     }
 
@@ -48,7 +48,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({ MissingServletRequestParameterException.class, MissingRequestHeaderException.class })
     public ResponseEntity<ErrorResponse> handleMissing(Exception e) {
-        var ec = COMMON_VALIDATION_ERROR;
+        var ec = VALIDATION_ERROR;
         return ResponseEntity.status(ec.httpStatus()).body(ErrorResponse.of(ec));
     }
 }

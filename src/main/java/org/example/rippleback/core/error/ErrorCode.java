@@ -5,10 +5,10 @@ import org.springframework.http.HttpStatus;
 public enum ErrorCode {
 
     // COMMON (9000~9099)
-    COMMON_VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "9000", "요청 형식이 올바르지 않습니다."),
-    COMMON_UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "9001", "인증이 필요합니다."),
-    COMMON_FORBIDDEN(HttpStatus.FORBIDDEN, "9002", "접근 권한이 없습니다."),
-    COMMON_NOT_FOUND(HttpStatus.NOT_FOUND, "9003", "요청한 자원을 찾을 수 없습니다."),
+    VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "9000", "요청 형식이 올바르지 않습니다."),
+    UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "9001", "인증이 필요합니다."),
+    FORBIDDEN(HttpStatus.FORBIDDEN, "9002", "접근 권한이 없습니다."),
+    NOT_FOUND(HttpStatus.NOT_FOUND, "9003", "요청한 자원을 찾을 수 없습니다."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "9009", "서버 내부 오류가 발생했습니다."),
 
     // USER (1000~1099)
