@@ -18,7 +18,7 @@ public class JsonAccessDeniedHandler implements AccessDeniedHandler {
 
     @Override
     public void handle(HttpServletRequest req, HttpServletResponse res, AccessDeniedException e) throws IOException {
-        var ec = ErrorCode.COMMON_FORBIDDEN;
+        var ec = ErrorCode.FORBIDDEN;
         res.setStatus(ec.httpStatus().value());
         res.setContentType("application/json;charset=UTF-8");
         om.writeValue(res.getWriter(), ErrorResponse.of(ec));

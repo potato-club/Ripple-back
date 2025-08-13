@@ -26,7 +26,7 @@ public class JsonAuthenticationEntryPoint implements AuthenticationEntryPoint {
             ec = be.errorCode();
         } else {
             String h = req.getHeader(HttpHeaders.AUTHORIZATION);
-            ec = (h == null || !h.startsWith("Bearer ")) ? ErrorCode.TOKEN_MISSING : ErrorCode.COMMON_UNAUTHORIZED;
+            ec = (h == null || !h.startsWith("Bearer ")) ? ErrorCode.TOKEN_MISSING : ErrorCode.UNAUTHORIZED;
         }
         res.setStatus(ec.httpStatus().value());
         res.setContentType("application/json;charset=UTF-8");

@@ -32,12 +32,16 @@ jwt:
   access-token-expiration: ${JWT_ACCESS_EXPIRATION:900000}
   refresh-token-expiration: ${JWT_REFRESH_EXPIRATION:1209600000}
 
+
 logging:
   level:
     org.hibernate.SQL: debug
     org.hibernate.type: trace
 
 app:
+  jwt:
+    allowed-clock-skew-seconds: 120
+
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:}
     allowed-methods: ${CORS_ALLOWED_METHODS:GET,POST,PUT,PATCH,DELETE,OPTIONS}
