@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.example.rippleback.core.error.exceptions.auth.TokenExpiredException;
 import org.example.rippleback.core.error.exceptions.auth.TokenInvalidException;
+import org.example.rippleback.core.error.exceptions.auth.TokenMissingException;
 import org.example.rippleback.core.error.exceptions.auth.TokenTypeInvalidException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -38,8 +39,27 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain)
             throws ServletException, IOException {
-        String token = resolveToken(request);
-        if (token != null) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader == null || authHeader.isBlank()) {
+            request.setAttribute("auth_error", new TokenMissingException());
+            filterChain.doFilter(request, response);
+            return;
+        }
+        if (!authHeader.startsWith("Bearer ")) {
+            request.setAttribute("auth_error", new TokenInvalidException());
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        String token = authHeader.substring(7);
+
+        if (token == null || token.isBlank()) {
+            request.setAttribute("auth_error", new TokenInvalidException());
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        if (token != null && !token.isBlank()) {
             try {
                 var c = jwtTokenProvider.decode(token);
                 if (TOKEN_TYPE_ACCESS.equals(c.tokenType())) {
@@ -57,13 +77,5 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
         }
         filterChain.doFilter(request, response);
-    }
-
-    private String resolveToken(HttpServletRequest request) {
-        String bearerToken = request.getHeader("Authorization");
-        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
-            return bearerToken.substring(7);
-        }
-        return null;
     }
 }
