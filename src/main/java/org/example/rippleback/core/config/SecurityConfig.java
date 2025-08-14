@@ -24,7 +24,6 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.time.Clock;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -33,17 +32,21 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final JwtTokenProvider jwtTokenProvider;
     private final CustomUserDetailsService customUserDetailsService;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final JsonAuthenticationEntryPoint authEntryPoint;
     private final JsonAccessDeniedHandler accessDeniedHandler;
 
-    @Value("${app.cors.allowed-origins:*}") private String corsAllowedOrigins;
-    @Value("${app.cors.allowed-methods:GET,POST,PUT,PATCH,DELETE,OPTIONS}") private String corsAllowedMethods;
-    @Value("${app.cors.allowed-headers:Authorization,Content-Type,X-Device-Id}") private String corsAllowedHeaders;
-    @Value("${app.cors.exposed-headers:Authorization}") private String corsExposedHeaders;
-    @Value("${app.cors.allow-credentials:true}") private boolean corsAllowCredentials;
+    @Value("${app.cors.allowed-origins:*}")
+    private String corsAllowedOrigins;
+    @Value("${app.cors.allowed-methods:GET,POST,PUT,PATCH,DELETE,OPTIONS}")
+    private String corsAllowedMethods;
+    @Value("${app.cors.allowed-headers:Authorization,Content-Type,X-Device-Id}")
+    private String corsAllowedHeaders;
+    @Value("${app.cors.exposed-headers:Authorization}")
+    private String corsExposedHeaders;
+    @Value("${app.cors.allow-credentials:true}")
+    private boolean corsAllowCredentials;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -56,8 +59,25 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler)
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/refresh").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/logout", "/api/auth/logout/all").authenticated()
+                        .requestMatchers(
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/swagger-resources/**",
+                                "/webjars/**",
+                                "/error"
+                        ).permitAll()
+
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/auth/login",
+                                "/api/auth/refresh"
+                        ).permitAll()
+
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/auth/logout",
+                                "/api/auth/logout/all"
+                        ).authenticated()
+
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
@@ -65,15 +85,26 @@ public class SecurityConfig {
         return http.build();
     }
 
-    @Bean public PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
-    @Bean public AuthenticationProvider authenticationProvider() {
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public AuthenticationProvider authenticationProvider() {
         var provider = new DaoAuthenticationProvider();
         provider.setUserDetailsService(customUserDetailsService);
         provider.setPasswordEncoder(passwordEncoder());
         return provider;
     }
-    @Bean public AuthenticationManager authenticationManager(AuthenticationConfiguration c) throws Exception { return c.getAuthenticationManager(); }
-    @Bean public CorsConfigurationSource corsConfigurationSource() {
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration c) throws Exception {
+        return c.getAuthenticationManager();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
         var config = new CorsConfiguration();
         config.setAllowCredentials(corsAllowCredentials);
         var origins = split(corsAllowedOrigins);
@@ -86,7 +117,7 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/**", config);
         return source;
     }
-    @Bean public Clock clock() { return Clock.systemUTC(); }
+
     private static List<String> split(String csv) {
         return Arrays.stream(csv.split(",")).map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList());
     }

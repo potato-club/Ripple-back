@@ -17,11 +17,11 @@ public class Block {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "from_user_id", nullable = false)
-    private Long fromUserId;
+    @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "from_user_id", nullable = false)
+    private User blocker;
 
-    @Column(name = "to_user_id", nullable = false)
-    private Long toUserId;
+    @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "to_user_id", nullable = false)
+    private User blocked;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

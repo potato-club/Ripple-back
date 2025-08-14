@@ -27,3 +27,4 @@
 
   # docker-compose up -d 으로 컨테이너 실행
   # docker-compose down 으로 컨테이너 중지
+  # docker exec -it ripple_db psql -U ripple_user -d ripple_db 으로 DB 접속

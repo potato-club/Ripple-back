@@ -101,4 +101,8 @@ public class User {
     public void bumpTokenVersion() {
         this.tokenVersion = this.tokenVersion + 1;
     }
+
+    public void changePassword(String encodedPassword) {
+        this.password = encodedPassword;
+    }
 }
