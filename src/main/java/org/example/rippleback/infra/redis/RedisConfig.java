@@ -3,6 +3,7 @@ package org.example.rippleback.infra.redis;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
@@ -14,6 +15,7 @@ public class RedisConfig {
     private final RedisConnectionFactory connectionFactory;
 
     @Bean
+    @Primary
     public RedisTemplate<String, String> redisTemplate() {
         RedisTemplate<String, String> template = new RedisTemplate<>();
         template.setConnectionFactory(connectionFactory);

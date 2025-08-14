@@ -70,7 +70,10 @@ public class SecurityConfig {
 
                         .requestMatchers(HttpMethod.POST,
                                 "/api/auth/login",
-                                "/api/auth/refresh"
+                                "/api/auth/refresh",
+                                "/api/users",
+                                "/api/users/email/verification/send",
+                                "/api/users/email/verification/verify"
                         ).permitAll()
 
                         .requestMatchers(HttpMethod.POST,

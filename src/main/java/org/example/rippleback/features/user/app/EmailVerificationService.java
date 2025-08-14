@@ -3,34 +3,86 @@ package org.example.rippleback.features.user.app;
 import lombok.RequiredArgsConstructor;
 import org.example.rippleback.core.error.exceptions.user.EmailCodeExpiredException;
 import org.example.rippleback.core.error.exceptions.user.EmailCodeInvalidException;
+import org.example.rippleback.infra.mail.EmailSender;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.Locale;
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
 public class EmailVerificationService {
 
-    private final RedisTemplate<String, String> redisTemplate;
+    private final RedisTemplate<String, String> redis;
+    private final EmailSender emailSender;
 
-    private static final String KEY_PREFIX = "email:ver:";
-    private static final Duration TTL = Duration.ofMinutes(10);
+    @Value("${app.email.code-ttl-seconds:600}")
+    private long codeTtlSeconds;
 
-    public String sendCode(String email) {
-        String code = String.format("%06d", ThreadLocalRandom.current().nextInt(0, 1_000_000));
-        String key = KEY_PREFIX + email.toLowerCase(Locale.ROOT);
-        redisTemplate.opsForValue().set(key, code, TTL);
-        return code;
+    @Value("${app.email.cooldown-seconds:30}")
+    private long cooldownSeconds;
+
+    private static final SecureRandom RND = new SecureRandom();
+
+    public void sendCode(String email) {
+        String em = normalize(email);
+        String coolKey = coolKey(em);
+        if (Boolean.TRUE.equals(redis.hasKey(coolKey))) return;
+        String code = generate6();
+        redis.opsForValue().set(codeKey(em), code, Duration.ofSeconds(codeTtlSeconds));
+        redis.opsForValue().set(coolKey, "1", Duration.ofSeconds(cooldownSeconds));
+        emailSender.send(em, "Ripple 인증 코드", "인증 코드: " + code);
     }
 
     public void verify(String email, String code) {
-        String key = KEY_PREFIX + email.toLowerCase(Locale.ROOT);
-        String saved = redisTemplate.opsForValue().get(key);
-        if (saved == null) throw new EmailCodeExpiredException();
-        if (!saved.equals(code)) throw new EmailCodeInvalidException();
-        redisTemplate.delete(key);
+        String em = normalize(email);
+        String verifiedKey = verifiedKey(em);
+        String key = codeKey(em);
+        String stored = redis.opsForValue().get(key);
+        if (stored == null) {
+            if (Boolean.TRUE.equals(redis.hasKey(verifiedKey))) return;
+            throw new EmailCodeExpiredException();
+        }
+        if (!stored.equals(code)) throw new EmailCodeInvalidException();
+        Long ttl = redis.getExpire(key, TimeUnit.SECONDS);
+        if (ttl == null || ttl <= 0) ttl = codeTtlSeconds;
+        redis.delete(key);
+        redis.opsForValue().set(verifiedKey, "1", Duration.ofSeconds(ttl));
+    }
+
+    public boolean isVerified(String email) {
+        return Boolean.TRUE.equals(redis.hasKey(verifiedKey(normalize(email))));
+    }
+
+    public void clear(String email) {
+        String em = normalize(email);
+        redis.delete(codeKey(em));
+        redis.delete(verifiedKey(em));
+        redis.delete(coolKey(em));
+    }
+
+    private static String normalize(String email) {
+        return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private static String codeKey(String email) {
+        return "ev:code:" + email;
+    }
+
+    private static String verifiedKey(String email) {
+        return "ev:ok:" + email;
+    }
+
+    private static String coolKey(String email) {
+        return "ev:cool:" + email;
+    }
+
+    private static String generate6() {
+        int n = RND.nextInt(1_000_000);
+        return String.format("%06d", n);
     }
 }
