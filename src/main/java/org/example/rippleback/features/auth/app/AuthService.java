@@ -41,17 +41,16 @@ public class AuthService {
     public LoginResponseDto login(LoginRequestDto request) {
         try {
             authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.email(), request.password())
+                    new UsernamePasswordAuthenticationToken(request.username(), request.password())
             );
         } catch (BadCredentialsException e) {
             throw new InvalidCredentialsException();
         }
 
-        User user = userRepository.findByEmail(request.email())
+        User user = userRepository.findByUsernameIgnoreCaseAndDeletedAtIsNull(request.username())
                 .orElseThrow(InvalidCredentialsException::new);
-        if (user.getStatus() != UserStatus.ACTIVE) {
-            throw new UserInactiveException();
-        }
+
+        if (user.getStatus() != UserStatus.ACTIVE) throw new UserInactiveException();
 
         Long userId = user.getId();
         long ver = user.getTokenVersion();
@@ -64,7 +63,7 @@ public class AuthService {
         String hash = TokenHash.sha256(refresh);
         refreshTokenService.store(userId, request.deviceId(), c.jti(), hash, remainMs);
 
-        user.setLastLoginAt(Instant.now(clock));
+        user.touchLastLogin(Instant.now(clock)); // ← 세터 대신 도메인 메서드
 
         return new LoginResponseDto(access, refresh);
     }

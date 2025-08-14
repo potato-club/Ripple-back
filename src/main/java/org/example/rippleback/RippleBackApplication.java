@@ -13,5 +13,4 @@ public class RippleBackApplication {
 
         SpringApplication.run(RippleBackApplication.class, args);
     }
-
 }

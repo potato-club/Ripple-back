@@ -68,13 +68,13 @@ class AuthFlowIntegrationTest {
     @BeforeEach
     void initUser() {
         userRepository.findByEmail(email).ifPresentOrElse(u -> {}, () -> {
-            User u = new User();
-            u.setUserId("u1");
-            u.setEmail(email);
-            u.setPassword(encoder.encode(rawPw));
-            u.setStatus(UserStatus.ACTIVE);
-            u.setTokenVersion(0L);
-            u.setCreatedAt(Instant.now());
+            User u = User.builder()
+                    .username("u1")
+                    .email(email)
+                    .password(encoder.encode(rawPw))
+                    .status(UserStatus.ACTIVE)
+                    .tokenVersion(0L)
+                    .build();
             userRepository.save(u);
         });
     }

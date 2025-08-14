@@ -13,18 +13,13 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class CustomUserDetailsService implements UserDetailsService {
-
     private final UserRepository userRepository;
 
-    /**
-     * username 파라미터에 이메일이 들어옵니다.
-     */
     @Override
-    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() ->
-                        new UsernameNotFoundException("User not found with email: " + email));
-
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        User user = userRepository
+                .findByUsernameIgnoreCaseAndDeletedAtIsNull(username)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
         return new CustomUserDetails(user);
     }
 }
