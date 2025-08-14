@@ -1,5 +1,6 @@
 package org.example.rippleback.features.auth.api;
 
+import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.rippleback.core.security.jwt.JwtPrincipal;
@@ -30,14 +31,16 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@AuthenticationPrincipal JwtPrincipal principal,
-                                       @RequestHeader("X-Device-Id") String deviceId) {
+    public ResponseEntity<Void> logout(
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
+            @RequestHeader("X-Device-Id") String deviceId) {
         authService.logout(principal.userId(), deviceId);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/logout/all")
-    public ResponseEntity<Void> logoutAll(@AuthenticationPrincipal JwtPrincipal principal) {
+    public ResponseEntity<Void> logoutAll(
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal) {
         authService.logoutAll(principal.userId());
         return ResponseEntity.noContent().build();
     }

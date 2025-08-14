@@ -67,7 +67,7 @@ class AuthFlowIntegrationTest {
 
     @BeforeEach
     void initUser() {
-        userRepository.findByEmail(email).ifPresentOrElse(u -> {}, () -> {
+        userRepository.findByEmailIgnoreCaseAndDeletedAtIsNull(email).ifPresentOrElse(u -> {}, () -> {
             User u = User.builder()
                     .username("u1")
                     .email(email)
