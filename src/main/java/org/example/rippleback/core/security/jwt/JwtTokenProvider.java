@@ -71,7 +71,7 @@ public class JwtTokenProvider {
     public TokenClaims decode(String token) {
         var jws = Jwts.parserBuilder()
                 .setSigningKey(hmacKey)
-                .setAllowedClockSkewSeconds(60)
+                .setAllowedClockSkewSeconds(props.allowedClockSkewSeconds())
                 .build()
                 .parseClaimsJws(token);
         var c = jws.getBody();
