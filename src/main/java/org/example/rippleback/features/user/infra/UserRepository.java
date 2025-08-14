@@ -12,6 +12,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByUsernameIgnoreCaseAndDeletedAtIsNull(String username);
     Optional<User> findByEmailIgnoreCaseAndDeletedAtIsNull(String email);
+
     boolean existsByUsernameIgnoreCaseAndDeletedAtIsNull(String username);
     boolean existsByEmailIgnoreCaseAndDeletedAtIsNull(String email);
 
@@ -19,10 +20,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
         select u
         from User u
         where u.deletedAt is null
-          and (
-                lower(u.username) like lower(concat('%', :q, '%'))
-             or lower(u.email)    like lower(concat('%', :q, '%'))
-          )
+          and ( lower(u.username) like lower(concat('%', :q, '%'))
+             or lower(u.email)    like lower(concat('%', :q, '%')) )
           and (:cursorId is null or u.id < :cursorId)
         order by u.id desc
         """)
