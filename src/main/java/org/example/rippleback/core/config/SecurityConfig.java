@@ -2,7 +2,6 @@ package org.example.rippleback.core.config;
 
 import lombok.RequiredArgsConstructor;
 import org.example.rippleback.core.security.jwt.JwtAuthenticationFilter;
-import org.example.rippleback.core.security.jwt.JwtTokenProvider;
 import org.example.rippleback.features.user.app.CustomUserDetailsService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;

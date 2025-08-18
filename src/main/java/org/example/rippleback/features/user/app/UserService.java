@@ -6,15 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.rippleback.core.error.exceptions.auth.InvalidCredentialsException;
 import org.example.rippleback.core.error.exceptions.image.InvalidImageUrlException;
 import org.example.rippleback.core.error.exceptions.user.*;
-import org.example.rippleback.features.user.api.dto.BlockResponseDto;
-import org.example.rippleback.features.user.api.dto.FollowResponseDto;
-import org.example.rippleback.features.user.api.dto.MeResponseDto;
-import org.example.rippleback.features.user.api.dto.PageCursorResponse;
-import org.example.rippleback.features.user.api.dto.SignupRequestDto;
-import org.example.rippleback.features.user.api.dto.SignupResponseDto;
-import org.example.rippleback.features.user.api.dto.UpdateProfileRequestDto;
-import org.example.rippleback.features.user.api.dto.UserResponseDto;
-import org.example.rippleback.features.user.api.dto.UserSummaryDto;
+import org.example.rippleback.features.user.api.dto.*;
 import org.example.rippleback.features.user.domain.Block;
 import org.example.rippleback.features.user.domain.Follow;
 import org.example.rippleback.features.user.domain.User;
@@ -33,6 +25,7 @@ import java.net.URISyntaxException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -52,18 +45,32 @@ public class UserService {
 
     @Transactional
     public SignupResponseDto signup(SignupRequestDto req) {
-        emailVerificationService.verify(req.email(), req.emailCode());
-        if (userRepository.existsByUsernameIgnoreCaseAndDeletedAtIsNull(req.username())) throw new DuplicateUsernameException();
-        if (userRepository.existsByEmailIgnoreCaseAndDeletedAtIsNull(req.email())) throw new DuplicateEmailException();
+        String normalizedEmail = req.email().trim().toLowerCase(Locale.ROOT);
+
+        if (!emailVerificationService.isVerified(normalizedEmail)) {
+            throw new EmailNotVerifiedException();
+        }
+
+        if (userRepository.existsByUsernameIgnoreCaseAndDeletedAtIsNull(req.username())) {
+            throw new DuplicateUsernameException();
+        }
+
+        if (userRepository.existsByEmailIgnoreCaseAndDeletedAtIsNull(normalizedEmail)) {
+            throw new DuplicateEmailException();
+        }
+
         User u = User.builder()
                 .username(req.username())
-                .email(req.email())
+                .email(normalizedEmail)
                 .password(passwordEncoder.encode(req.password()))
                 .emailVerified(true)
                 .status(UserStatus.ACTIVE)
                 .tokenVersion(0L)
                 .build();
+
         userRepository.save(u);
+        emailVerificationService.clear(normalizedEmail);
+
         return UserMapper.toSignup(u);
     }
 
@@ -97,7 +104,8 @@ public class UserService {
     public UserResponseDto updateProfile(Long meId, UpdateProfileRequestDto req) {
         User me = loadActiveForWrite(meId);
         if (req.username() != null && !req.username().equalsIgnoreCase(me.getUsername())) {
-            if (userRepository.existsByUsernameIgnoreCaseAndDeletedAtIsNull(req.username())) throw new DuplicateUsernameException();
+            if (userRepository.existsByUsernameIgnoreCaseAndDeletedAtIsNull(req.username()))
+                throw new DuplicateUsernameException();
         }
         requireValidImageUrl(req.profileImageUrl());
         me.updateProfile(req.username(), req.profileMessage(), req.profileImageUrl());
@@ -125,7 +133,8 @@ public class UserService {
         User target = userRepository.findById(targetId).orElseThrow(UserNotFoundException::new);
         if (target.getStatus() == UserStatus.SUSPENDED) throw new UserInactiveException();
         if (target.getStatus() == UserStatus.DELETED) throw new UserNotFoundException();
-        if (blockRepository.existsMeBlockedTarget(meId, targetId)) throw new FollowNotAllowedYouBlockedTargetException();
+        if (blockRepository.existsMeBlockedTarget(meId, targetId))
+            throw new FollowNotAllowedYouBlockedTargetException();
         if (followRepository.existsLink(meId, targetId)) throw new FollowAlreadyExistsException();
         Follow f = Follow.builder()
                 .follower(em.getReference(User.class, meId))
@@ -211,5 +220,6 @@ public class UserService {
         }
     }
 
-    public record AvailabilityResponse(Boolean usernameAvailable, Boolean emailAvailable) {}
+    public record AvailabilityResponse(Boolean usernameAvailable, Boolean emailAvailable) {
+    }
 }

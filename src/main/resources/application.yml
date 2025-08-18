@@ -60,4 +60,3 @@ app:
     allowed-headers: ${CORS_ALLOWED_HEADERS:Authorization,Content-Type,X-Device-Id}
     exposed-headers: ${CORS_EXPOSED_HEADERS:Authorization}
     allow-credentials: ${CORS_ALLOW_CREDENTIALS:true}
-
