@@ -29,7 +29,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final Set<String> SKIP_EXACT = Set.of(
             "/api/auth/login",
-            "/api/auth/refresh"
+            "/api/auth/refresh",
+            "/api/users",
+            "/api/users/email/verification/send",
+            "/api/users/email/verification/verify"
     );
 
     private static final String[] SKIP_PREFIX = new String[] {

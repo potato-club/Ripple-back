@@ -1,30 +1,38 @@
-  services:
-    db:
-      image: postgres:15
-      container_name: ripple_db
-      environment:
-        POSTGRES_USER: ${DB_USER}
-        POSTGRES_PASSWORD: ${DB_PASSWORD}
-        POSTGRES_DB: ripple_db
-      ports:
-        - "5432:5432"
-      volumes:
-        - db_data:/var/lib/postgresql/data
-      restart: unless-stopped
+services:
+  db:
+    image: postgres:15
+    container_name: ripple_db
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ripple_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    restart: unless-stopped
 
-    redis:
-      image: redis:7.2
-      container_name: ripple_redis
-      ports:
-        - "6379:6379"
-      volumes:
-        - redis_data:/data
-      restart: unless-stopped
+  redis:
+    image: redis:7.2
+    container_name: ripple_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
 
-  volumes:
-    db_data:
-    redis_data:
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: ripple_mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    restart: unless-stopped
 
-  # docker-compose up -d 으로 컨테이너 실행
-  # docker-compose down 으로 컨테이너 중지
-  # docker exec -it ripple_db psql -U ripple_user -d ripple_db 으로 DB 접속
+volumes:
+  db_data:
+  redis_data:
+
+# docker-compose up -d 으로 컨테이너 실행
+# docker-compose down 으로 컨테이너 중지
+# docker exec -it ripple_db psql -U ripple_user -d ripple_db 으로 DB 접속
