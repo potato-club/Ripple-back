@@ -12,15 +12,18 @@ import java.time.Instant;
 @Builder
 @Entity
 @Table(name = "user_follow",
-        uniqueConstraints = @UniqueConstraint(name = "uq_user_follow", columnNames = {"from_user_id","to_user_id"}))
+        uniqueConstraints = @UniqueConstraint(name = "uq_user_follow", columnNames = {"from_user_id", "to_user_id"}))
 public class Follow {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "from_user_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "from_user_id", nullable = false)
     private User follower;
 
-    @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "to_user_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "to_user_id", nullable = false)
     private User following;
 
     @CreationTimestamp

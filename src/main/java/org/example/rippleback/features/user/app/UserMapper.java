@@ -1,10 +1,14 @@
 package org.example.rippleback.features.user.app;
 
-import org.example.rippleback.features.user.api.dto.*;
+import org.example.rippleback.features.user.api.dto.MeResponseDto;
+import org.example.rippleback.features.user.api.dto.SignupResponseDto;
+import org.example.rippleback.features.user.api.dto.UserResponseDto;
+import org.example.rippleback.features.user.api.dto.UserSummaryDto;
 import org.example.rippleback.features.user.domain.User;
 
 public final class UserMapper {
-    private UserMapper() {}
+    private UserMapper() {
+    }
 
     public static MeResponseDto toMe(User u) {
         return new MeResponseDto(

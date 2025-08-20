@@ -8,6 +8,10 @@
     {
       "url": "https://c0821bd1-b684-459d-b14c-8532480d2f46.mock.pstmn.io",
       "description": "Mock (24/7)"
+    },
+    {
+      "url": "http://localhost:8080",
+      "description": "Local"
     }
   ],
   "security": [
