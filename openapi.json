@@ -1,0 +1,1162 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Ripple API",
+    "version": "v1"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Generated server url"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/api/users": {
+      "get": {
+        "tags": [
+          "user-controller"
+        ],
+        "summary": "유저 검색",
+        "description": "쿼리 기반 유저 검색",
+        "operationId": "search",
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": ""
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "검색 결과 반환",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageCursorResponseUserSummaryDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "user-controller"
+        ],
+        "summary": "회원가입",
+        "description": "이메일 인증 완료 후 사용자 생성",
+        "operationId": "signup",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignupRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "회원가입 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignupResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이메일 미인증 (1004)",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignupResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "검증 오류 또는 중복 (1000/1001/9000)",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignupResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/{targetId}/follow": {
+      "post": {
+        "tags": [
+          "user-controller"
+        ],
+        "summary": "팔로우",
+        "description": "AccessToken 필요",
+        "operationId": "follow",
+        "parameters": [
+          {
+            "name": "targetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "팔로우 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/FollowResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "자기 자신 팔로우/중복/차단 (1015/1011/1017)",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/FollowResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "사용자 없음 (1005)",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/FollowResponseDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "user-controller"
+        ],
+        "summary": "언팔로우",
+        "description": "AccessToken 필요",
+        "operationId": "unfollow",
+        "parameters": [
+          {
+            "name": "targetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "언팔로우 성공 (멱등)"
+          }
+        }
+      }
+    },
+    "/api/users/{targetId}/block": {
+      "post": {
+        "tags": [
+          "user-controller"
+        ],
+        "summary": "차단",
+        "description": "AccessToken 필요",
+        "operationId": "block",
+        "parameters": [
+          {
+            "name": "targetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "차단 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlockResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "자기 자신 차단/중복 차단 (1016/1013)",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlockResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "사용자 없음 (1005)",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlockResponseDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "user-controller"
+        ],
+        "summary": "차단 해제",
+        "description": "AccessToken 필요",
+        "operationId": "unblock",
+        "parameters": [
+          {
+            "name": "targetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "차단 해제 성공 (멱등)"
+          }
+        }
+      }
+    },
+    "/api/users/email/verification/verify": {
+      "post": {
+        "tags": [
+          "user-controller"
+        ],
+        "summary": "이메일 인증 코드 검증",
+        "description": "사용자가 받은 코드를 통해 이메일 인증",
+        "operationId": "verifyEmail",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailVerificationVerifyRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "이메일 인증 성공"
+          },
+          "400": {
+            "description": "잘못된 코드/만료됨 (1002/1003)"
+          }
+        }
+      }
+    },
+    "/api/users/email/verification/send": {
+      "post": {
+        "tags": [
+          "user-controller"
+        ],
+        "summary": "이메일 인증 코드 전송",
+        "description": "인증을 위한 이메일 코드 전송",
+        "operationId": "sendEmailCode",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailVerificationSendRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "이메일 전송 완료"
+          }
+        }
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "tags": [
+          "auth-controller"
+        ],
+        "summary": "토큰 재발급",
+        "description": "RefreshToken으로 새로운 AccessToken/RefreshToken 재발급",
+        "operationId": "refresh",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "토큰 재발급 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "리프레시 토큰 유효하지 않음 (1105/1109)",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "auth-controller"
+        ],
+        "summary": "로그아웃",
+        "description": "특정 디바이스에서 로그아웃 (RefreshToken 무효화)",
+        "operationId": "logout",
+        "parameters": [
+          {
+            "name": "X-Device-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "로그아웃 성공"
+          }
+        }
+      }
+    },
+    "/api/auth/logout/all": {
+      "post": {
+        "tags": [
+          "auth-controller"
+        ],
+        "summary": "전체 로그아웃",
+        "description": "해당 유저의 모든 디바이스에서 로그아웃 (모든 RefreshToken 무효화)",
+        "operationId": "logoutAll",
+        "responses": {
+          "204": {
+            "description": "전체 로그아웃 성공"
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "auth-controller"
+        ],
+        "summary": "로그인",
+        "description": "username/email + password로 로그인, 토큰 발급",
+        "operationId": "login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "로그인 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "자격 증명 오류 (1100)",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 형식 오류 (9000)",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/me/profile": {
+      "patch": {
+        "tags": [
+          "user-controller"
+        ],
+        "summary": "프로필 수정",
+        "description": "AccessToken 필요",
+        "operationId": "updateProfile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "프로필 수정 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "이미지 URL 오류/중복 유저네임 (1603/1000)",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/me/password": {
+      "patch": {
+        "tags": [
+          "user-controller"
+        ],
+        "summary": "비밀번호 변경",
+        "description": "AccessToken 필요",
+        "operationId": "changePassword",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "비밀번호 변경 성공"
+          },
+          "400": {
+            "description": "현재 비밀번호 불일치 (1100)"
+          }
+        }
+      }
+    },
+    "/api/users/{id}": {
+      "get": {
+        "tags": [
+          "user-controller"
+        ],
+        "summary": "프로필 조회 (ID)",
+        "description": "AccessToken 필요",
+        "operationId": "getById",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "프로필 정보 반환",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "사용자 없음/삭제됨 (1005)",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/{id}/followings": {
+      "get": {
+        "tags": [
+          "user-controller"
+        ],
+        "summary": "팔로잉 목록 조회",
+        "description": "AccessToken 필요",
+        "operationId": "followings",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "팔로잉 목록 반환",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageCursorResponseUserSummaryDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/{id}/followers": {
+      "get": {
+        "tags": [
+          "user-controller"
+        ],
+        "summary": "팔로워 목록 조회",
+        "description": "AccessToken 필요",
+        "operationId": "followers",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "팔로워 목록 반환",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageCursorResponseUserSummaryDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/me": {
+      "get": {
+        "tags": [
+          "user-controller"
+        ],
+        "summary": "내 정보 조회",
+        "description": "AccessToken 필요",
+        "operationId": "me",
+        "responses": {
+          "200": {
+            "description": "내 정보 반환",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponseDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "user-controller"
+        ],
+        "summary": "회원 탈퇴",
+        "description": "AccessToken 필요",
+        "operationId": "deleteMe",
+        "responses": {
+          "204": {
+            "description": "탈퇴 성공"
+          }
+        }
+      }
+    },
+    "/api/users/me/blocks": {
+      "get": {
+        "tags": [
+          "user-controller"
+        ],
+        "summary": "내 차단 목록 조회",
+        "description": "AccessToken 필요",
+        "operationId": "myBlocks",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "차단 목록 반환",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageCursorResponseUserSummaryDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/by-username/{username}": {
+      "get": {
+        "tags": [
+          "user-controller"
+        ],
+        "summary": "프로필 조회 (유저네임)",
+        "description": "AccessToken 필요",
+        "operationId": "getByUsername",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "프로필 정보 반환",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "사용자 없음/삭제됨 (1005)",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/availability": {
+      "get": {
+        "tags": [
+          "user-controller"
+        ],
+        "summary": "유저 중복 확인",
+        "description": "username/email 중복 확인",
+        "operationId": "availability",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "email",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "중복 여부 반환",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvailabilityResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "SignupRequestDto": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9_]{3,20}$"
+          },
+          "email": {
+            "type": "string",
+            "minLength": 1
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 72,
+            "minLength": 8
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "username"
+        ]
+      },
+      "SignupResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "username": {
+            "type": "string"
+          },
+          "emailVerified": {
+            "type": "boolean"
+          }
+        }
+      },
+      "FollowResponseDto": {
+        "type": "object",
+        "properties": {
+          "fromUserId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "toUserId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "following": {
+            "type": "boolean"
+          }
+        }
+      },
+      "BlockResponseDto": {
+        "type": "object",
+        "properties": {
+          "fromUserId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "toUserId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "blocked": {
+            "type": "boolean"
+          }
+        }
+      },
+      "EmailVerificationVerifyRequestDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "minLength": 1
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 6,
+            "minLength": 6
+          }
+        },
+        "required": [
+          "code",
+          "email"
+        ]
+      },
+      "EmailVerificationSendRequestDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "TokenRequestDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "minLength": 1
+          },
+          "deviceId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "deviceId",
+          "refreshToken"
+        ]
+      },
+      "TokenResponseDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "refreshToken": {
+            "type": "string"
+          }
+        }
+      },
+      "LoginRequestDto": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9_]{3,20}$"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1
+          },
+          "deviceId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "deviceId",
+          "password",
+          "username"
+        ]
+      },
+      "LoginResponseDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "refreshToken": {
+            "type": "string"
+          }
+        }
+      },
+      "UpdateProfileRequestDto": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_]{3,20}$"
+          },
+          "profileMessage": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 0
+          },
+          "profileImageUrl": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 0
+          }
+        }
+      },
+      "UserResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "username": {
+            "type": "string"
+          },
+          "profileImageUrl": {
+            "type": "string"
+          },
+          "profileMessage": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "ChangePasswordRequestDto": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "maxLength": 72,
+            "minLength": 8
+          },
+          "newPassword": {
+            "type": "string",
+            "maxLength": 72,
+            "minLength": 8
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ]
+      },
+      "PageCursorResponseUserSummaryDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserSummaryDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string"
+          },
+          "hasNext": {
+            "type": "boolean"
+          }
+        }
+      },
+      "UserSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "username": {
+            "type": "string"
+          },
+          "profileImageUrl": {
+            "type": "string"
+          },
+          "profileMessage": {
+            "type": "string"
+          }
+        }
+      },
+      "MeResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "username": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "emailVerified": {
+            "type": "boolean"
+          },
+          "profileImageUrl": {
+            "type": "string"
+          },
+          "profileMessage": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "tokenVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lastLoginAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AvailabilityResponse": {
+        "type": "object",
+        "properties": {
+          "usernameAvailable": {
+            "type": "boolean"
+          },
+          "emailAvailable": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}
