@@ -1,8 +1,8 @@
-package org.example.rippleback.core.error.exceptions.comment;
+package org.example.rippleback.core.error.exceptions.image;
 
 import org.example.rippleback.core.error.BusinessException;
 import org.example.rippleback.core.error.ErrorCode;
 
-public class CommentNotFoundException extends BusinessException {
-    @Override public ErrorCode errorCode() { return ErrorCode.COMMENT_NOT_FOUND; }
+public class CorruptedImageDataException extends BusinessException {
+    @Override public ErrorCode errorCode() { return ErrorCode.CORRUPTED_IMAGE_DATA; }
 }

@@ -10,7 +10,6 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 
 import static org.example.rippleback.core.error.ErrorCode.*;
-import java.util.Arrays;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -24,22 +23,10 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException e) {
-        var fieldErrors = e.getBindingResult().getFieldErrors();
-
-        // 1) S3ObjectKey 위반 있으면 INVALID_OBJECT_KEY로 특화
-        boolean objectKeyViolation = fieldErrors.stream().anyMatch(fe ->
-                fe.getCodes() != null && Arrays.stream(fe.getCodes()).anyMatch(code -> code.contains("S3ObjectKey"))
-        );
-        if (objectKeyViolation) {
-            var ec = INVALID_OBJECT_KEY; // 1601
-            return ResponseEntity.status(ec.httpStatus()).body(ErrorResponse.of(ec));
-        }
-
-        // 2) 그 외는 공통 9000
         var ec = VALIDATION_ERROR;
-        return ResponseEntity.status(ec.httpStatus()).body(ErrorResponse.of(ec));
+        return ResponseEntity.status(ec.httpStatus())
+                .body(ErrorResponse.of(ec));
     }
-
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException e) {

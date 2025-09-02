@@ -1,7 +1,11 @@
 package org.example.rippleback.core.error;
 
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 
+@Getter
+@RequiredArgsConstructor
 public enum ErrorCode {
 
     // COMMON (9000–9099)
@@ -67,14 +71,4 @@ public enum ErrorCode {
     private final HttpStatus httpStatus;
     private final String code;
     private final String message;
-
-    ErrorCode(HttpStatus httpStatus, String code, String message) {
-        this.httpStatus = httpStatus;
-        this.code = code;
-        this.message = message;
-    }
-
-    public HttpStatus httpStatus() { return httpStatus; }
-    public String code() { return code; }
-    public String message() { return message; }
 }
