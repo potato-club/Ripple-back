@@ -1,7 +1,7 @@
   services:
     db:
       image: postgres:15
-      container_name: ripple_db
+      container_name: ripple-postgres
       environment:
         POSTGRES_USER: ${DB_USER}
         POSTGRES_PASSWORD: ${DB_PASSWORD}
