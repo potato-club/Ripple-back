@@ -4,7 +4,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.example.rippleback.core.error.exceptions.auth.InvalidCredentialsException;
-import org.example.rippleback.core.error.exceptions.image.InvalidImageUrlException;
+import org.example.rippleback.core.error.exceptions.media.InvalidImageUrlException;
 import org.example.rippleback.core.error.exceptions.user.*;
 import org.example.rippleback.features.user.api.dto.*;
 import org.example.rippleback.features.user.domain.Block;
