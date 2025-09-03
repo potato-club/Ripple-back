@@ -1,7 +1,8 @@
 package org.example.rippleback.core.error.exceptions.common;
 
-public class NotFoundException extends RuntimeException {
-    public NotFoundException(String message) {
-        super(message);
-    }
+import org.example.rippleback.core.error.BusinessException;
+import org.example.rippleback.core.error.ErrorCode;
+
+public class NotFoundException extends BusinessException {
+    @Override public ErrorCode errorCode() { return ErrorCode.NOT_FOUND; }
 }

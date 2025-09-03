@@ -1,7 +1,11 @@
 package org.example.rippleback.core.error.exceptions.common;
 
-public class InternalServerException extends RuntimeException {
-    public InternalServerException(String message) {
-        super(message);
+import org.example.rippleback.core.error.BusinessException;
+import org.example.rippleback.core.error.ErrorCode;
+
+public class InternalServerException extends BusinessException {
+    @Override
+    public ErrorCode errorCode() {
+        return ErrorCode.INTERNAL_SERVER_ERROR;
     }
 }
