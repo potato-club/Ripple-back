@@ -85,7 +85,7 @@ public class AuthService {
 
         String tokenDevice = c.deviceId();
         if (tokenDevice == null || !tokenDevice.equals(request.deviceId())) {
-            throw new DeviceMismatchException();
+            throw new DeviceMismatchException(request.deviceId(),  tokenDevice);
         }
 
         if (refreshTokenService.isUsed(jti)) {

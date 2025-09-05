@@ -4,10 +4,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.rippleback.core.security.jwt.JwtPrincipal;
-import org.example.rippleback.features.auth.api.dto.LoginRequestDto;
-import org.example.rippleback.features.auth.api.dto.LoginResponseDto;
-import org.example.rippleback.features.auth.api.dto.TokenRequestDto;
-import org.example.rippleback.features.auth.api.dto.TokenResponseDto;
+import org.example.rippleback.features.auth.api.dto.*;
 import org.example.rippleback.features.auth.app.AuthService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -32,15 +29,18 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(
-            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
-            @RequestHeader("X-Device-Id") String deviceId) {
-        authService.logout(principal.userId(), deviceId);
+            @Parameter(hidden = true)
+            @AuthenticationPrincipal JwtPrincipal principal,
+            @Valid
+            @RequestBody LogoutRequestDto request) {
+        authService.logout(principal.userId(), request.deviceId());
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/logout/all")
     public ResponseEntity<Void> logoutAll(
-            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal) {
+            @Parameter(hidden = true)
+            @AuthenticationPrincipal JwtPrincipal principal) {
         authService.logoutAll(principal.userId());
         return ResponseEntity.noContent().build();
     }

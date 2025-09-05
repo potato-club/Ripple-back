@@ -6,22 +6,9 @@ import lombok.RequiredArgsConstructor;
 import org.example.rippleback.core.error.exceptions.auth.InvalidCredentialsException;
 import org.example.rippleback.core.error.exceptions.image.InvalidImageUrlException;
 import org.example.rippleback.core.error.exceptions.user.*;
-import org.example.rippleback.features.user.api.dto.BlockResponseDto;
-import org.example.rippleback.features.user.api.dto.FollowResponseDto;
-import org.example.rippleback.features.user.api.dto.MeResponseDto;
-import org.example.rippleback.features.user.api.dto.PageCursorResponse;
-import org.example.rippleback.features.user.api.dto.SignupRequestDto;
-import org.example.rippleback.features.user.api.dto.SignupResponseDto;
-import org.example.rippleback.features.user.api.dto.UpdateProfileRequestDto;
-import org.example.rippleback.features.user.api.dto.UserResponseDto;
-import org.example.rippleback.features.user.api.dto.UserSummaryDto;
-import org.example.rippleback.features.user.domain.Block;
-import org.example.rippleback.features.user.domain.Follow;
-import org.example.rippleback.features.user.domain.User;
-import org.example.rippleback.features.user.domain.UserStatus;
-import org.example.rippleback.features.user.infra.BlockRepository;
-import org.example.rippleback.features.user.infra.FollowRepository;
-import org.example.rippleback.features.user.infra.UserRepository;
+import org.example.rippleback.features.user.api.dto.*;
+import org.example.rippleback.features.user.domain.*;
+import org.example.rippleback.features.user.infra.*;
 import org.example.rippleback.infra.redis.RefreshTokenService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -53,8 +40,12 @@ public class UserService {
     @Transactional
     public SignupResponseDto signup(SignupRequestDto req) {
         emailVerificationService.verify(req.email(), req.emailCode());
-        if (userRepository.existsByUsernameIgnoreCaseAndDeletedAtIsNull(req.username())) throw new DuplicateUsernameException();
-        if (userRepository.existsByEmailIgnoreCaseAndDeletedAtIsNull(req.email())) throw new DuplicateEmailException();
+        if (userRepository.existsByUsernameIgnoreCaseAndDeletedAtIsNull(req.username())) {
+            throw new DuplicateUsernameException(req.email());
+        }
+        if (userRepository.existsByEmailIgnoreCaseAndDeletedAtIsNull(req.email())) {
+            throw new DuplicateEmailException(req.email());
+        }
         User u = User.builder()
                 .username(req.username())
                 .email(req.email())
@@ -79,7 +70,8 @@ public class UserService {
     }
 
     public UserResponseDto getProfileByUsername(String username) {
-        User u = userRepository.findByUsernameIgnoreCaseAndDeletedAtIsNull(username).orElseThrow(UserNotFoundException::new);
+        User u = userRepository.findByUsernameIgnoreCaseAndDeletedAtIsNull(username)
+                .orElseThrow(UserNotFoundException::new);
         if (u.getStatus() != UserStatus.ACTIVE) throw new UserNotFoundException();
         return UserMapper.toProfile(u);
     }
@@ -97,7 +89,9 @@ public class UserService {
     public UserResponseDto updateProfile(Long meId, UpdateProfileRequestDto req) {
         User me = loadActiveForWrite(meId);
         if (req.username() != null && !req.username().equalsIgnoreCase(me.getUsername())) {
-            if (userRepository.existsByUsernameIgnoreCaseAndDeletedAtIsNull(req.username())) throw new DuplicateUsernameException();
+            if (userRepository.existsByUsernameIgnoreCaseAndDeletedAtIsNull(req.username())) {
+                throw new DuplicateUsernameException(req.username());
+            }
         }
         requireValidImageUrl(req.profileImageUrl());
         me.updateProfile(req.username(), req.profileMessage(), req.profileImageUrl());
@@ -107,7 +101,9 @@ public class UserService {
     @Transactional
     public void changePassword(Long meId, String current, String newPw) {
         User me = loadActiveForWrite(meId);
-        if (!passwordEncoder.matches(current, me.getPassword())) throw new InvalidCredentialsException();
+        if (!passwordEncoder.matches(current, me.getPassword())) {
+            throw new InvalidCredentialsException();
+        }
         me.changePassword(passwordEncoder.encode(newPw));
     }
 
@@ -127,6 +123,7 @@ public class UserService {
         if (target.getStatus() == UserStatus.DELETED) throw new UserNotFoundException();
         if (blockRepository.existsMeBlockedTarget(meId, targetId)) throw new FollowNotAllowedYouBlockedTargetException();
         if (followRepository.existsLink(meId, targetId)) throw new FollowAlreadyExistsException();
+
         Follow f = Follow.builder()
                 .follower(em.getReference(User.class, meId))
                 .following(em.getReference(User.class, targetId))
@@ -147,8 +144,10 @@ public class UserService {
         if (target.getStatus() == UserStatus.SUSPENDED) throw new UserInactiveException();
         if (target.getStatus() == UserStatus.DELETED) throw new UserNotFoundException();
         if (blockRepository.existsMeBlockedTarget(meId, targetId)) throw new BlockAlreadyExistsException();
+
         followRepository.deleteLink(meId, targetId);
         followRepository.deleteLink(targetId, meId);
+
         Block b = Block.builder()
                 .blocker(em.getReference(User.class, meId))
                 .blocked(em.getReference(User.class, targetId))
