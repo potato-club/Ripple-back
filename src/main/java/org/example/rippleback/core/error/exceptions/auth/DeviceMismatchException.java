@@ -1,6 +1,7 @@
 package org.example.rippleback.core.error.exceptions.auth;
 
 
+import lombok.Getter;
 import org.example.rippleback.core.error.BusinessException;
 import org.example.rippleback.core.error.ErrorCode;
 
@@ -8,6 +9,7 @@ import org.example.rippleback.core.error.ErrorCode;
 import java.util.Map;
 
 
+@Getter
 public class DeviceMismatchException extends BusinessException {
     private final String expectedDevice;
     private final String actualDevice;
@@ -20,6 +22,4 @@ public class DeviceMismatchException extends BusinessException {
     }
 
 
-    public String getExpectedDevice() { return expectedDevice; }
-    public String getActualDevice() { return actualDevice; }
 }
