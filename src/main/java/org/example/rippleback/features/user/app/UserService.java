@@ -6,9 +6,9 @@ import lombok.RequiredArgsConstructor;
 import org.example.rippleback.core.error.exceptions.auth.InvalidCredentialsException;
 import org.example.rippleback.core.error.exceptions.user.*;
 import org.example.rippleback.features.media.domain.Media;
-import org.example.rippleback.features.media.domain.MediaStatus;
-import org.example.rippleback.features.media.domain.MediaType;
 import org.example.rippleback.features.media.infra.MediaRepository;
+import org.example.rippleback.features.post.domain.PostStatus;
+import org.example.rippleback.features.post.infra.PostRepository;
 import org.example.rippleback.features.user.api.dto.*;
 import org.example.rippleback.features.user.domain.Block;
 import org.example.rippleback.features.user.domain.Follow;
@@ -36,6 +36,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final FollowRepository followRepository;
     private final BlockRepository blockRepository;
+    private final PostRepository postRepository;
     private final MediaRepository mediaRepository;
     private final EmailVerificationService emailVerificationService;
     private final PasswordEncoder passwordEncoder;
@@ -85,13 +86,25 @@ public class UserService {
     public UserResponseDto getProfileById(Long id) {
         User u = userRepository.findById(id).orElseThrow(UserNotFoundException::new);
         if (u.getStatus() != UserStatus.ACTIVE) throw new UserNotFoundException();
-        return userMapper.toProfile(u);
+
+        long posts = postRepository.countByAuthorIdAndStatus(id, PostStatus.PUBLISHED);
+        long followers = followRepository.countByFollowingId(id);
+        long followings = followRepository.countByFollowerId(id);
+
+        return userMapper.toProfile(u, posts, followers, followings);
     }
 
     public UserResponseDto getProfileByUsername(String username) {
         User u = userRepository.findByUsernameIgnoreCaseAndDeletedAtIsNull(username).orElseThrow(UserNotFoundException::new);
         if (u.getStatus() != UserStatus.ACTIVE) throw new UserNotFoundException();
-        return userMapper.toProfile(u);
+
+        long id = u.getId();
+
+        long posts = postRepository.countByAuthorIdAndStatus(id, PostStatus.PUBLISHED);
+        long followers = followRepository.countByFollowingId(id);
+        long followings = followRepository.countByFollowerId(id);
+
+        return userMapper.toProfile(u, posts, followers, followings);
     }
 
     public PageCursorResponse<UserSummaryDto> search(String q, Long cursor, int size) {
@@ -129,18 +142,24 @@ public class UserService {
             case SET -> {
                 Long mediaId = img.mediaId();
                 if (mediaId == null) throw new IllegalArgumentException("mediaId required"); // TODO
-                var m = mediaRepository.findById(mediaId)
+                Media m = mediaRepository.findById(mediaId)
                         .orElseThrow(() -> new IllegalArgumentException("media not found")); // TODO
-                // TODO: owner == meId, type == IMAGE, status == READY 검증
+                // TODO: 소유자/타입/상태 검증
+                // if (!m.getOwnerId().equals(meId)) throw ...
+                // if (m.getMediaType() != MediaType.IMAGE) throw ...
+                // if (m.getMediaStatus() != MediaStatus.READY) throw ...
                 me.updateProfileImage(m.getId());
             }
             case CLEAR -> me.clearProfileImage();
             case KEEP -> { /* no-op */ }
         }
 
-        return userMapper.toProfile(me);
-    }
+        long posts = postRepository.countByAuthorIdAndStatus(meId, PostStatus.PUBLISHED);
+        long followers = followRepository.countByFollowingId(meId);
+        long followings = followRepository.countByFollowerId(meId);
 
+        return userMapper.toProfile(me, posts, followers, followings);
+    }
 
 
     @Transactional
@@ -166,7 +185,7 @@ public class UserService {
         if (target.getStatus() == UserStatus.DELETED) throw new UserNotFoundException();
         if (blockRepository.existsMeBlockedTarget(meId, targetId))
             throw new FollowNotAllowedYouBlockedTargetException();
-        if (followRepository.existsLink(meId, targetId)) throw new FollowAlreadyExistsException();
+        if (followRepository.existsByFollowerIdAndFollowingId(meId, targetId)) throw new FollowAlreadyExistsException();
         Follow f = Follow.builder()
                 .follower(em.getReference(User.class, meId))
                 .following(em.getReference(User.class, targetId))
@@ -204,19 +223,40 @@ public class UserService {
 
     public PageCursorResponse<UserSummaryDto> listFollowers(Long userId, Long cursor, int size) {
         int pageSize = Math.max(1, Math.min(size, 50));
-        var edges = followRepository.findFollowers(userId, cursor, PageRequest.of(0, pageSize));
-        var items = edges.stream().map(e -> userMapper.toSummary(e.getFollower())).toList();
-        String next = edges.size() == pageSize ? String.valueOf(edges.get(edges.size() - 1).getId()) : null;
+
+        var edges = (cursor == null)
+                ? followRepository.findByFollowingIdOrderByIdDesc(userId, PageRequest.of(0, pageSize))
+                : followRepository.findByFollowingIdAndIdLessThanOrderByIdDesc(userId, cursor, PageRequest.of(0, pageSize));
+
+        var items = edges.stream()
+                .map(e -> userMapper.toSummary(e.getFollower())) // 나를 팔로우하는 "사람" 리스트
+                .toList();
+
+        String next = edges.size() == pageSize
+                ? String.valueOf(edges.get(edges.size() - 1).getId())
+                : null;
+
         return new PageCursorResponse<>(items, next, next != null);
     }
 
     public PageCursorResponse<UserSummaryDto> listFollowings(Long userId, Long cursor, int size) {
         int pageSize = Math.max(1, Math.min(size, 50));
-        var edges = followRepository.findFollowings(userId, cursor, PageRequest.of(0, pageSize));
-        var items = edges.stream().map(e -> userMapper.toSummary(e.getFollowing())).toList();
-        String next = edges.size() == pageSize ? String.valueOf(edges.get(edges.size() - 1).getId()) : null;
+
+        var edges = (cursor == null)
+                ? followRepository.findByFollowerIdOrderByIdDesc(userId, PageRequest.of(0, pageSize))
+                : followRepository.findByFollowerIdAndIdLessThanOrderByIdDesc(userId, cursor, PageRequest.of(0, pageSize));
+
+        var items = edges.stream()
+                .map(e -> userMapper.toSummary(e.getFollowing())) // 내가 팔로우 "하는" 사람 리스트
+                .toList();
+
+        String next = edges.size() == pageSize
+                ? String.valueOf(edges.get(edges.size() - 1).getId())
+                : null;
+
         return new PageCursorResponse<>(items, next, next != null);
     }
+
 
     public PageCursorResponse<UserSummaryDto> listMyBlocks(Long meId, Long cursor, int size) {
         int pageSize = Math.max(1, Math.min(size, 50));

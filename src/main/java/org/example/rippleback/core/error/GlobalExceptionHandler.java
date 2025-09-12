@@ -10,6 +10,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 
 import static org.example.rippleback.core.error.ErrorCode.*;
+import java.util.Arrays;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
