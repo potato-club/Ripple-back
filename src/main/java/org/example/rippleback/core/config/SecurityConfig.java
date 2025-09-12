@@ -109,16 +109,29 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         var config = new CorsConfiguration();
         config.setAllowCredentials(corsAllowCredentials);
-        var origins = split(corsAllowedOrigins);
-        if (origins.size() == 1 && "*".equals(origins.get(0))) config.setAllowedOriginPatterns(List.of("*"));
-        else config.setAllowedOrigins(origins);
+
+        var origins = split(corsAllowedOrigins); // CSV → List
+        boolean containsPattern = origins.stream().anyMatch(o -> o.contains("*"));
+
+        if (origins.size() == 1 && "*".equals(origins.get(0))) {
+            config.setAllowedOriginPatterns(List.of("*"));
+        } else if (containsPattern) {
+            config.setAllowedOriginPatterns(origins);
+        } else {
+            config.setAllowedOrigins(origins);
+        }
+
         config.setAllowedMethods(split(corsAllowedMethods));
         config.setAllowedHeaders(split(corsAllowedHeaders));
         config.setExposedHeaders(split(corsExposedHeaders));
+        // (선택) 프리플라이트 캐시 시간
+        // config.setMaxAge(3600L);
+
         var source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;
     }
+
 
     private static List<String> split(String csv) {
         return Arrays.stream(csv.split(",")).map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList());

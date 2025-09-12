@@ -7,60 +7,31 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+@Repository
 public interface FollowRepository extends JpaRepository<Follow, Long> {
 
-    // ===== 조인 없는 파생 쿼리 =====
+    // 카운트
+    long countByFollowingId(Long userId); // 팔로워 수(나를 팔로우)
+    long countByFollowerId(Long userId);  // 팔로잉 수(내가 팔로우)
+
+    // 존재/중복 체크
     boolean existsByFollowerIdAndFollowingId(Long followerId, Long followingId);
 
-    @Transactional
+    // 링크 삭제(언팔/차단시 양방향 정리 등에 사용)
     @Modifying
-    int deleteByFollowerIdAndFollowingId(Long followerId, Long followingId);
+    @Query("delete from Follow f where f.followerId = :followerId and f.followingId = :followingId")
+    void deleteLink(@Param("followerId") Long followerId, @Param("followingId") Long followingId);
 
-    long countByFollowingId(Long userId);  // 팔로워 수
-    long countByFollowerId(Long userId);   // 팔로잉 수
+    // 목록(커서 기반 페이지네이션용)
+    List<Follow> findByFollowingIdAndIdLessThanOrderByIdDesc(Long userId, Long cursor, Pageable page); // followers
+    List<Follow> findByFollowerIdAndIdLessThanOrderByIdDesc(Long userId, Long cursor, Pageable page);  // followings
 
-    // ===== 목록 조회: 조건은 FK 값으로, 필요한 연관만 페치 =====
-    @EntityGraph(attributePaths = "follower")
-    @Query("""
-        select f from Follow f
-        where f.followingId = :userId
-          and (:cursorId is null or f.id < :cursorId)
-        order by f.id desc
-    """)
-    List<Follow> findFollowers(@Param("userId") Long userId,
-                               @Param("cursorId") Long cursorId,
-                               Pageable pageable);
-
-    @EntityGraph(attributePaths = "following")
-    @Query("""
-        select f from Follow f
-        where f.followerId = :userId
-          and (:cursorId is null or f.id < :cursorId)
-        order by f.id desc
-    """)
-    List<Follow> findFollowings(@Param("userId") Long userId,
-                                @Param("cursorId") Long cursorId,
-                                Pageable pageable);
-
-    // ===== 기존 서비스 호환용(default 위임) =====
-    default boolean existsLink(Long followerId, Long followingId) {
-        return existsByFollowerIdAndFollowingId(followerId, followingId);
-    }
-
-    @Transactional
-    default int deleteLink(Long followerId, Long followingId) {
-        return deleteByFollowerIdAndFollowingId(followerId, followingId);
-    }
-
-    @Deprecated // 서비스에서 교체 권장: countByFollowingId/countByFollowerId 사용
-    @Query("select count(f) from Follow f where f.followingId = :userId")
-    long countFollowers(@Param("userId") Long userId);
-
-    @Deprecated // 서비스에서 교체 권장: countByFollowerId 사용
-    @Query("select count(f) from Follow f where f.followerId = :userId")
-    long countFollowings(@Param("userId") Long userId);
+    // 최초 페이지(커서 없음)
+    List<Follow> findByFollowingIdOrderByIdDesc(Long userId, Pageable page);
+    List<Follow> findByFollowerIdOrderByIdDesc(Long userId, Pageable page);
 }

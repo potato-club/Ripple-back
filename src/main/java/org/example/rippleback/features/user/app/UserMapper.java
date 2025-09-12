@@ -33,13 +33,14 @@ public class UserMapper {
         );
     }
 
-    public UserResponseDto toProfile(User u) {
+    public UserResponseDto toProfile(User u, long postCnt, long followerCnt, long followingCnt) {
         return new UserResponseDto(
                 u.getId(),
                 u.getUsername(),
-                profileImageUrlOf(u),                      // ← URL
-                u.getProfileMessage(),
-                u.getStatus().name()
+                profileImageUrlOf(u),
+                postCnt,
+                followerCnt,
+                followingCnt
         );
     }
 

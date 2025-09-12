@@ -65,7 +65,9 @@ public class Post {
     @Builder.Default
     private int commentCount = 0;
 
-    /** PostgreSQL text[] 매핑 */
+    /**
+     * PostgreSQL text[] 매핑
+     */
     @JdbcTypeCode(SqlTypes.ARRAY)
     @Column(name = "tags_norm", columnDefinition = "text[]", nullable = false)
     @Builder.Default
@@ -105,22 +107,46 @@ public class Post {
         this.updatedAt = Instant.now();
     }
 
-    public void setMediaCounts(int imageCount, boolean hasVideo) {
-        if (imageCount < 0 || imageCount > 15) {
-            throw new IllegalArgumentException("image_count must be between 0 and 15");
-        }
-        this.imageCount = (short) imageCount;
-        this.hasVideo = hasVideo;
+    public void applyMediaCounts(int imageCount, boolean hasVideo) {
+        this.imageCount = (short) imageCount; // 0..15 범위 검증은 서비스에서 수행
+        this.hasVideo = hasVideo;             // 상호배타 검증도 서비스에서
         this.updatedAt = Instant.now();
     }
 
-    public void incLike()      { this.likeCount      = Math.max(0, this.likeCount + 1); }
-    public void decLike()      { this.likeCount      = Math.max(0, this.likeCount - 1); }
-    public void incBookmark()  { this.bookmarkCount  = Math.max(0, this.bookmarkCount + 1); }
-    public void decBookmark()  { this.bookmarkCount  = Math.max(0, this.bookmarkCount - 1); }
-    public void incComment()   { this.commentCount   = Math.max(0, this.commentCount + 1); }
-    public void decComment()   { this.commentCount   = Math.max(0, this.commentCount - 1); }
+    @Deprecated
+    public void setMediaCounts(int imageCount, boolean hasVideo) {
+        applyMediaCounts(imageCount, hasVideo);
+    }
 
-    public boolean isPublished() { return this.status == PostStatus.PUBLISHED; }
-    public boolean isDeleted()   { return this.status == PostStatus.DELETED; }
+    public void incLike() {
+        this.likeCount = Math.max(0, this.likeCount + 1);
+    }
+
+    public void decLike() {
+        this.likeCount = Math.max(0, this.likeCount - 1);
+    }
+
+    public void incBookmark() {
+        this.bookmarkCount = Math.max(0, this.bookmarkCount + 1);
+    }
+
+    public void decBookmark() {
+        this.bookmarkCount = Math.max(0, this.bookmarkCount - 1);
+    }
+
+    public void incComment() {
+        this.commentCount = Math.max(0, this.commentCount + 1);
+    }
+
+    public void decComment() {
+        this.commentCount = Math.max(0, this.commentCount - 1);
+    }
+
+    public boolean isPublished() {
+        return this.status == PostStatus.PUBLISHED;
+    }
+
+    public boolean isDeleted() {
+        return this.status == PostStatus.DELETED;
+    }
 }
