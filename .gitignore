@@ -58,3 +58,6 @@ docker/*.env
 
 # Maven (if someone accidentally builds with Maven)
 target/
+
+# postman mock 환경
+openapi-update.md

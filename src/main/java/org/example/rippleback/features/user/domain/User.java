@@ -2,6 +2,7 @@ package org.example.rippleback.features.user.domain;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.example.rippleback.features.media.domain.Media;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -38,8 +39,12 @@ public class User {
     @Column(length = 255, nullable = false)
     private String password;
 
-    @Column(name = "profile_image_url", columnDefinition = "text")
-    private String profileImageUrl;
+    @Column(name = "profile_media_id")
+    private Long profileMediaId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "profile_media_id", insertable = false, updatable = false)
+    private Media profileMedia;
 
     @Column(name = "profile_message", length = 255)
     private String profileMessage;
@@ -75,10 +80,20 @@ public class User {
         this.emailVerified = true;
     }
 
-    public void updateProfile(String newUsername, String newMessage, String newImageUrl) {
-        if (newUsername != null && !newUsername.isBlank()) this.username = newUsername;
+    public void changeUsername(String newUsername) {
+        this.username = newUsername;
+    }
+
+    public void changeProfileMessage(String newMessage) {
         this.profileMessage = newMessage;
-        this.profileImageUrl = newImageUrl;
+    }
+
+    public void updateProfileImage(Long mediaId) {
+        this.profileMediaId = mediaId;
+    }
+
+    public void clearProfileImage() {
+        this.profileMediaId = null;
     }
 
     public void touchLastLogin(Instant now) {

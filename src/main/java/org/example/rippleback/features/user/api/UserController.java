@@ -94,7 +94,7 @@ public class UserController {
     @Operation(summary = "프로필 수정", description = "AccessToken 필요")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "프로필 수정 성공"),
-            @ApiResponse(responseCode = "400", description = "이미지 URL 오류/중복 유저네임 (1603/1000)")
+            @ApiResponse(responseCode = "400", description = "유효하지 않은 object_key/중복 유저네임 (1601/1000)")
     })
     @PatchMapping("/me/profile")
     public ResponseEntity<UserResponseDto> updateProfile(

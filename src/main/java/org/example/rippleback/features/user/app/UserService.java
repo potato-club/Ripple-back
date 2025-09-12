@@ -4,8 +4,11 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.example.rippleback.core.error.exceptions.auth.InvalidCredentialsException;
-import org.example.rippleback.core.error.exceptions.image.InvalidImageUrlException;
 import org.example.rippleback.core.error.exceptions.user.*;
+import org.example.rippleback.features.media.domain.Media;
+import org.example.rippleback.features.media.domain.MediaStatus;
+import org.example.rippleback.features.media.domain.MediaType;
+import org.example.rippleback.features.media.infra.MediaRepository;
 import org.example.rippleback.features.user.api.dto.*;
 import org.example.rippleback.features.user.domain.Block;
 import org.example.rippleback.features.user.domain.Follow;
@@ -20,8 +23,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -35,9 +36,11 @@ public class UserService {
     private final UserRepository userRepository;
     private final FollowRepository followRepository;
     private final BlockRepository blockRepository;
+    private final MediaRepository mediaRepository;
     private final EmailVerificationService emailVerificationService;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
+    private final UserMapper userMapper;
     private final Clock clock;
 
     @PersistenceContext
@@ -71,24 +74,24 @@ public class UserService {
         userRepository.save(u);
         emailVerificationService.clear(normalizedEmail);
 
-        return UserMapper.toSignup(u);
+        return userMapper.toSignup(u);
     }
 
     public MeResponseDto getMe(Long meId) {
         User u = userRepository.findById(meId).orElseThrow(UserNotFoundException::new);
-        return UserMapper.toMe(u);
+        return userMapper.toMe(u);
     }
 
     public UserResponseDto getProfileById(Long id) {
         User u = userRepository.findById(id).orElseThrow(UserNotFoundException::new);
         if (u.getStatus() != UserStatus.ACTIVE) throw new UserNotFoundException();
-        return UserMapper.toProfile(u);
+        return userMapper.toProfile(u);
     }
 
     public UserResponseDto getProfileByUsername(String username) {
         User u = userRepository.findByUsernameIgnoreCaseAndDeletedAtIsNull(username).orElseThrow(UserNotFoundException::new);
         if (u.getStatus() != UserStatus.ACTIVE) throw new UserNotFoundException();
-        return UserMapper.toProfile(u);
+        return userMapper.toProfile(u);
     }
 
     public PageCursorResponse<UserSummaryDto> search(String q, Long cursor, int size) {
@@ -96,21 +99,49 @@ public class UserService {
         List<User> users = userRepository.search(q == null ? "" : q, cursor, PageRequest.of(0, pageSize));
         String next = users.size() == pageSize ? String.valueOf(users.get(users.size() - 1).getId()) : null;
         boolean hasNext = next != null;
-        List<UserSummaryDto> items = users.stream().map(UserMapper::toSummary).toList();
+        List<UserSummaryDto> items = users.stream().map(userMapper::toSummary).toList();
         return new PageCursorResponse<>(items, next, hasNext);
     }
 
     @Transactional
     public UserResponseDto updateProfile(Long meId, UpdateProfileRequestDto req) {
         User me = loadActiveForWrite(meId);
-        if (req.username() != null && !req.username().equalsIgnoreCase(me.getUsername())) {
-            if (userRepository.existsByUsernameIgnoreCaseAndDeletedAtIsNull(req.username()))
-                throw new DuplicateUsernameException();
+
+        if (req.username() != null) {
+            String nu = req.username().strip();
+            if (!nu.equalsIgnoreCase(me.getUsername())) {
+                if (userRepository.existsByUsernameIgnoreCaseAndDeletedAtIsNull(nu)) {
+                    throw new IllegalArgumentException("duplicate username"); // TODO 교체
+                }
+                me.changeUsername(nu);
+            }
         }
-        requireValidImageUrl(req.profileImageUrl());
-        me.updateProfile(req.username(), req.profileMessage(), req.profileImageUrl());
-        return UserMapper.toProfile(me);
+        if (req.profileMessage() != null) {
+            me.changeProfileMessage(req.profileMessage());
+        }
+
+        var img = req.profileImage();
+        var action = (img == null || img.action() == null)
+                ? UpdateProfileRequestDto.ProfileImagePatch.Action.KEEP
+                : img.action();
+
+        switch (action) {
+            case SET -> {
+                Long mediaId = img.mediaId();
+                if (mediaId == null) throw new IllegalArgumentException("mediaId required"); // TODO
+                var m = mediaRepository.findById(mediaId)
+                        .orElseThrow(() -> new IllegalArgumentException("media not found")); // TODO
+                // TODO: owner == meId, type == IMAGE, status == READY 검증
+                me.updateProfileImage(m.getId());
+            }
+            case CLEAR -> me.clearProfileImage();
+            case KEEP -> { /* no-op */ }
+        }
+
+        return userMapper.toProfile(me);
     }
+
+
 
     @Transactional
     public void changePassword(Long meId, String current, String newPw) {
@@ -174,7 +205,7 @@ public class UserService {
     public PageCursorResponse<UserSummaryDto> listFollowers(Long userId, Long cursor, int size) {
         int pageSize = Math.max(1, Math.min(size, 50));
         var edges = followRepository.findFollowers(userId, cursor, PageRequest.of(0, pageSize));
-        var items = edges.stream().map(e -> UserMapper.toSummary(e.getFollower())).toList();
+        var items = edges.stream().map(e -> userMapper.toSummary(e.getFollower())).toList();
         String next = edges.size() == pageSize ? String.valueOf(edges.get(edges.size() - 1).getId()) : null;
         return new PageCursorResponse<>(items, next, next != null);
     }
@@ -182,7 +213,7 @@ public class UserService {
     public PageCursorResponse<UserSummaryDto> listFollowings(Long userId, Long cursor, int size) {
         int pageSize = Math.max(1, Math.min(size, 50));
         var edges = followRepository.findFollowings(userId, cursor, PageRequest.of(0, pageSize));
-        var items = edges.stream().map(e -> UserMapper.toSummary(e.getFollowing())).toList();
+        var items = edges.stream().map(e -> userMapper.toSummary(e.getFollowing())).toList();
         String next = edges.size() == pageSize ? String.valueOf(edges.get(edges.size() - 1).getId()) : null;
         return new PageCursorResponse<>(items, next, next != null);
     }
@@ -190,7 +221,7 @@ public class UserService {
     public PageCursorResponse<UserSummaryDto> listMyBlocks(Long meId, Long cursor, int size) {
         int pageSize = Math.max(1, Math.min(size, 50));
         var edges = blockRepository.findBlocks(meId, cursor, PageRequest.of(0, pageSize));
-        var items = edges.stream().map(e -> UserMapper.toSummary(e.getBlocked())).toList();
+        var items = edges.stream().map(e -> userMapper.toSummary(e.getBlocked())).toList();
         String next = edges.size() == pageSize ? String.valueOf(edges.get(edges.size() - 1).getId()) : null;
         return new PageCursorResponse<>(items, next, next != null);
     }
@@ -206,18 +237,6 @@ public class UserService {
         if (u.getStatus() == UserStatus.SUSPENDED) throw new UserInactiveException();
         if (u.getStatus() == UserStatus.DELETED) throw new UserNotFoundException();
         return u;
-    }
-
-    private static void requireValidImageUrl(String url) {
-        if (url == null || url.isBlank()) return;
-        if (url.length() > 2048) throw new InvalidImageUrlException();
-        try {
-            URI u = new URI(url);
-            String s = u.getScheme();
-            if (!"http".equalsIgnoreCase(s) && !"https".equalsIgnoreCase(s)) throw new InvalidImageUrlException();
-        } catch (URISyntaxException e) {
-            throw new InvalidImageUrlException();
-        }
     }
 
     public record AvailabilityResponse(Boolean usernameAvailable, Boolean emailAvailable) {
