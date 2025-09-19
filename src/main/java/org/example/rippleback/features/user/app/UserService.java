@@ -30,7 +30,6 @@ import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class UserService {
 
     private final UserRepository userRepository;
@@ -47,6 +46,7 @@ public class UserService {
     @PersistenceContext
     private EntityManager em;
 
+    // --------- 쓰기 트랜잭션 ---------
     @Transactional
     public SignupResponseDto signup(SignupRequestDto req) {
         String normalizedEmail = req.email().trim().toLowerCase(Locale.ROOT);
@@ -54,11 +54,9 @@ public class UserService {
         if (!emailVerificationService.isVerified(normalizedEmail)) {
             throw new EmailNotVerifiedException();
         }
-
         if (userRepository.existsByUsernameIgnoreCaseAndDeletedAtIsNull(req.username())) {
             throw new DuplicateUsernameException();
         }
-
         if (userRepository.existsByEmailIgnoreCaseAndDeletedAtIsNull(normalizedEmail)) {
             throw new DuplicateEmailException();
         }
@@ -78,11 +76,14 @@ public class UserService {
         return userMapper.toSignup(u);
     }
 
+    // --------- 읽기 전용 트랜잭션 ---------
+    @Transactional(readOnly = true)
     public MeResponseDto getMe(Long meId) {
         User u = userRepository.findById(meId).orElseThrow(UserNotFoundException::new);
         return userMapper.toMe(u);
     }
 
+    @Transactional(readOnly = true)
     public UserResponseDto getProfileById(Long id) {
         User u = userRepository.findById(id).orElseThrow(UserNotFoundException::new);
         if (u.getStatus() != UserStatus.ACTIVE) throw new UserNotFoundException();
@@ -94,12 +95,12 @@ public class UserService {
         return userMapper.toProfile(u, posts, followers, followings);
     }
 
+    @Transactional(readOnly = true)
     public UserResponseDto getProfileByUsername(String username) {
         User u = userRepository.findByUsernameIgnoreCaseAndDeletedAtIsNull(username).orElseThrow(UserNotFoundException::new);
         if (u.getStatus() != UserStatus.ACTIVE) throw new UserNotFoundException();
 
         long id = u.getId();
-
         long posts = postRepository.countByAuthorIdAndStatus(id, PostStatus.PUBLISHED);
         long followers = followRepository.countByFollowingId(id);
         long followings = followRepository.countByFollowerId(id);
@@ -107,6 +108,7 @@ public class UserService {
         return userMapper.toProfile(u, posts, followers, followings);
     }
 
+    @Transactional(readOnly = true)
     public PageCursorResponse<UserSummaryDto> search(String q, Long cursor, int size) {
         int pageSize = Math.max(1, Math.min(size, 50));
         List<User> users = userRepository.search(q == null ? "" : q, cursor, PageRequest.of(0, pageSize));
@@ -116,6 +118,7 @@ public class UserService {
         return new PageCursorResponse<>(items, next, hasNext);
     }
 
+    // --------- 쓰기 트랜잭션 ---------
     @Transactional
     public UserResponseDto updateProfile(Long meId, UpdateProfileRequestDto req) {
         User me = loadActiveForWrite(meId);
@@ -145,9 +148,6 @@ public class UserService {
                 Media m = mediaRepository.findById(mediaId)
                         .orElseThrow(() -> new IllegalArgumentException("media not found")); // TODO
                 // TODO: 소유자/타입/상태 검증
-                // if (!m.getOwnerId().equals(meId)) throw ...
-                // if (m.getMediaType() != MediaType.IMAGE) throw ...
-                // if (m.getMediaStatus() != MediaStatus.READY) throw ...
                 me.updateProfileImage(m.getId());
             }
             case CLEAR -> me.clearProfileImage();
@@ -160,7 +160,6 @@ public class UserService {
 
         return userMapper.toProfile(me, posts, followers, followings);
     }
-
 
     @Transactional
     public void changePassword(Long meId, String current, String newPw) {
@@ -221,6 +220,8 @@ public class UserService {
         blockRepository.deleteLink(meId, targetId);
     }
 
+    // --------- 읽기 전용 트랜잭션 ---------
+    @Transactional(readOnly = true)
     public PageCursorResponse<UserSummaryDto> listFollowers(Long userId, Long cursor, int size) {
         int pageSize = Math.max(1, Math.min(size, 50));
 
@@ -229,7 +230,7 @@ public class UserService {
                 : followRepository.findByFollowingIdAndIdLessThanOrderByIdDesc(userId, cursor, PageRequest.of(0, pageSize));
 
         var items = edges.stream()
-                .map(e -> userMapper.toSummary(e.getFollower())) // 나를 팔로우하는 "사람" 리스트
+                .map(e -> userMapper.toSummary(e.getFollower()))
                 .toList();
 
         String next = edges.size() == pageSize
@@ -239,6 +240,7 @@ public class UserService {
         return new PageCursorResponse<>(items, next, next != null);
     }
 
+    @Transactional(readOnly = true)
     public PageCursorResponse<UserSummaryDto> listFollowings(Long userId, Long cursor, int size) {
         int pageSize = Math.max(1, Math.min(size, 50));
 
@@ -247,7 +249,7 @@ public class UserService {
                 : followRepository.findByFollowerIdAndIdLessThanOrderByIdDesc(userId, cursor, PageRequest.of(0, pageSize));
 
         var items = edges.stream()
-                .map(e -> userMapper.toSummary(e.getFollowing())) // 내가 팔로우 "하는" 사람 리스트
+                .map(e -> userMapper.toSummary(e.getFollowing()))
                 .toList();
 
         String next = edges.size() == pageSize
@@ -257,7 +259,7 @@ public class UserService {
         return new PageCursorResponse<>(items, next, next != null);
     }
 
-
+    @Transactional(readOnly = true)
     public PageCursorResponse<UserSummaryDto> listMyBlocks(Long meId, Long cursor, int size) {
         int pageSize = Math.max(1, Math.min(size, 50));
         var edges = blockRepository.findBlocks(meId, cursor, PageRequest.of(0, pageSize));
@@ -266,12 +268,14 @@ public class UserService {
         return new PageCursorResponse<>(items, next, next != null);
     }
 
+    @Transactional(readOnly = true)
     public AvailabilityResponse availability(String username, String email) {
         Boolean u = username == null ? null : !userRepository.existsByUsernameIgnoreCaseAndDeletedAtIsNull(username);
         Boolean e = email == null ? null : !userRepository.existsByEmailIgnoreCaseAndDeletedAtIsNull(email);
         return new AvailabilityResponse(u, e);
     }
 
+    // 트랜잭션 경계는 호출자(쓰기 메서드)에서 보장
     private User loadActiveForWrite(Long userId) {
         User u = userRepository.findById(userId).orElseThrow(UserNotFoundException::new);
         if (u.getStatus() == UserStatus.SUSPENDED) throw new UserInactiveException();
@@ -279,6 +283,5 @@ public class UserService {
         return u;
     }
 
-    public record AvailabilityResponse(Boolean usernameAvailable, Boolean emailAvailable) {
-    }
+    public record AvailabilityResponse(Boolean usernameAvailable, Boolean emailAvailable) {}
 }
