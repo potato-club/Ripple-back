@@ -1,5 +1,11 @@
 server:
   port: ${SERVER_PORT:8080}
+  forward-headers-strategy: native
+  ssl:
+    enabled: ${SSL_ENABLED:false}
+    key-store: ${SSL_KEY_STORE:}
+    key-store-type: ${SSL_KEY_STORE_TYPE:PKCS12}
+    key-store-password: ${SSL_KEY_STORE_PASSWORD:}
 
 spring:
   config:
@@ -10,6 +16,9 @@ spring:
     username: ${DB_USER}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      data-source-properties:
+        applicationName: RippleLocal
 
   jpa:
     hibernate:
@@ -45,6 +54,9 @@ logging:
   level:
     org.hibernate.SQL: debug
     org.hibernate.type: trace
+    com.zaxxer.hikari.HikariConfig: DEBUG
+    com.zaxxer.hikari: DEBUG
+    org.springframework.boot.context.config: DEBUG
 
 app:
   mail:
@@ -63,3 +75,12 @@ app:
 
 cdn:
   base-url: ${CDN_BASE_URL}
+
+auth:
+  cookie:
+    name: __Secure-RT
+    path: /api/auth/refresh
+    same-site: None
+    secure: true
+    http-only: true
+    domain: ""
