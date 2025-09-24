@@ -132,6 +132,9 @@ public class AuthService {
     }
 
     private JwtTokenProvider.TokenClaims decodeRefreshOrThrow(String token) {
+        if (token == null || token.isBlank()) {     // ★ 추가
+            throw new TokenMissingException();
+        }
         try {
             var c = jwtTokenProvider.decode(token);
             if (!"refresh".equals(c.tokenType())) {
@@ -144,4 +147,5 @@ public class AuthService {
             throw new TokenInvalidException();
         }
     }
+
 }
