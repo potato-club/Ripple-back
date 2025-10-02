@@ -1,0 +1,67 @@
+name: Deploy Ripple Backend to EC2 via GHCR
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+concurrency:
+  group: ripple-ec2-deploy
+  cancel-in-progress: true
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Ripple-back/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/ripple-back:latest
+            ghcr.io/${{ github.repository_owner }}/ripple-back:${{ github.sha }}
+          platforms: linux/amd64          # t2.micro = amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH to EC2 and deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}   # EIP 또는 도메인
+          username: ${{ secrets.EC2_USER }} # ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}   # ripple-ec2-key.pem 내용
+          script: |
+            set -euo pipefail
+
+            # GHCR가 private일 때만 로그인 (public이면 스킵)
+            if [ -n "${{ secrets.GHCR_READ_TOKEN }}" ]; then
+              echo "${{ secrets.GHCR_READ_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+            fi
+
+            # EC2에 있는 compose/env만 사용
+            cd ~/deploy
+            test -f docker-compose.prod.yml || { echo "docker-compose.prod.yml 없음"; exit 1; }
+
+            # 최신 이미지 받아서 롤아웃
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d
+            docker image prune -f
+
+            # 스모크 체크(선택)
+            docker ps
+            # curl -fsS http://127.0.0.1:8080/actuator/health || true
