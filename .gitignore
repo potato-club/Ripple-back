@@ -52,6 +52,7 @@ replay_pid*
 # Docker (optional overrides, local envs)
 docker-compose.override.yml
 docker/*.env
+docker-compose.yml
 
 # Testcontainers (keep local-only settings out of VCS)
 .testcontainers.properties
