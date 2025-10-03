@@ -17,21 +17,27 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR (GITHUB_TOKEN)
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+
+      - name: Build & Push
+        uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Ripple-back/Dockerfile
+          file: ./Ripple-back/Dockerfile         # <- 프로젝트 경로 확인
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/ripple-back:latest
             ghcr.io/${{ github.repository_owner }}/ripple-back:${{ github.sha }}
-          platforms: linux/amd64          # t2.micro = amd64
+          platforms: linux/amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -39,29 +45,59 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
+      # 0) AWS 자격 구성 (Secrets 사용)
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ secrets.AWS_REGION }}
+
+      # 1) 러너 퍼블릭 IP를 /32로 SG:22에 임시 허용
+      - name: Allow runner IP on SG:22
+        id: ipopen
+        shell: bash
+        run: |
+          RUNNER_IP=$(curl -s https://checkip.amazonaws.com | tr -d '\n')
+          echo "runner_ip=$RUNNER_IP" >> "$GITHUB_OUTPUT"
+          aws ec2 authorize-security-group-ingress \
+            --group-id "${{ secrets.EC2_SG_ID }}" \
+            --ip-permissions "IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges=[{CidrIp=${RUNNER_IP}/32,Description=gh-actions-temp}]" \
+          || true
+
+      # 2) SSH로 배포
       - name: SSH to EC2 and deploy
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.EC2_HOST }}   # EIP 또는 도메인
-          username: ${{ secrets.EC2_USER }} # ec2-user
-          key: ${{ secrets.EC2_SSH_KEY }}   # ripple-ec2-key.pem 내용
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             set -euo pipefail
 
-            # GHCR가 private일 때만 로그인 (public이면 스킵)
+            # GHCR가 private이면 로그인 (public이면 생략됨)
             if [ -n "${{ secrets.GHCR_READ_TOKEN }}" ]; then
               echo "${{ secrets.GHCR_READ_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
             fi
 
-            # EC2에 있는 compose/env만 사용
             cd ~/deploy
-            test -f docker-compose.prod.yml || { echo "docker-compose.prod.yml 없음"; exit 1; }
+            test -f docker-compose.yml || { echo "docker-compose.yml 없음"; exit 1; }
+            test -f .env || { echo ".env 없음"; exit 1; }
 
-            # 최신 이미지 받아서 롤아웃
-            docker compose -f docker-compose.prod.yml pull
-            docker compose -f docker-compose.prod.yml up -d
+            docker compose -f docker-compose.yml pull
+            docker compose -f docker-compose.yml up -d
             docker image prune -f
-
-            # 스모크 체크(선택)
             docker ps
-            # curl -fsS http://127.0.0.1:8080/actuator/health || true
+
+      # 3) 허용 해제 (항상 실행)
+      - name: Revoke runner IP on SG:22
+        if: always()
+        shell: bash
+        run: |
+          RUNNER_IP="${{ steps.ipopen.outputs.runner_ip }}"
+          if [ -n "$RUNNER_IP" ]; then
+            aws ec2 revoke-security-group-ingress \
+              --group-id "${{ secrets.EC2_SG_ID }}" \
+              --ip-permissions "IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges=[{CidrIp=${RUNNER_IP}/32}]" \
+            || true
+          fi
