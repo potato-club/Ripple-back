@@ -2,19 +2,24 @@
 FROM gradle:8.8-jdk21-alpine AS build
 WORKDIR /workspace
 COPY . .
-# 테스트는 스킵해서 빠르게
-RUN gradle bootJar -x test
+RUN --mount=type=cache,target=/home/gradle/.gradle \
+    gradle clean bootJar -x test
 
 # ---- run stage (JRE 21) ----
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
-# (선택) 한국 시간대
+# healthcheck에서 사용할 curl 설치
+RUN apk add --no-cache curl
+
+# (선택) 한국 시간대 설정
 # RUN apk add --no-cache tzdata && ln -sf /usr/share/zoneinfo/Asia/Seoul /etc/localtime
 
-# 산출물 복사 (파일명 고정 시 더 안전)
-# build.gradle에 아래 한 줄을 넣어두면 경로 확정됩니다:
-# tasks.bootJar { archiveFileName = "app.jar" }
+# 비루트 권장
+RUN addgroup -S spring && adduser -S spring -G spring
+USER spring
+
+# JAR 복사 (파일명 고정 권장: 아래 '참고' 참고)
 COPY --from=build /workspace/build/libs/app.jar /app/app.jar
 
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
