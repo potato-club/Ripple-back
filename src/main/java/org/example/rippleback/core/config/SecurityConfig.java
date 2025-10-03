@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 
 @Configuration
 @RequiredArgsConstructor
-@EnableConfigurationProperties({ org.example.rippleback.core.config.AuthCookieProperties.class })
+@EnableConfigurationProperties({org.example.rippleback.core.config.AuthCookieProperties.class})
 public class SecurityConfig {
 
     private final CustomUserDetailsService customUserDetailsService;
@@ -66,7 +66,10 @@ public class SecurityConfig {
                                 "/swagger-ui.html",
                                 "/swagger-resources/**",
                                 "/webjars/**",
-                                "/error"
+                                "/error",
+                                "/actuator/health",
+                                "/actuator/health/**",
+                                "/actuator/info"
                         ).permitAll()
 
                         .requestMatchers(HttpMethod.POST,
