@@ -2,9 +2,10 @@ package org.example.rippleback.features.message.domain;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.example.rippleback.features.user.domain.User;
 
-import java.time.LocalDateTime;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Getter
@@ -19,20 +20,18 @@ public class Conversation {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
-    private Long userAId;
-
-    @Column(nullable = false)
-    private Long userBId;
-
-    @Column(nullable = false)
-    private LocalDateTime createdAt;
+    @ManyToMany
+    @JoinTable(
+            name = "conversation_participants",
+            joinColumns = @JoinColumn(name = "conversation_id"),
+            inverseJoinColumns = @JoinColumn(name = "user_id")
+    )
+    private Set<User> participants = new HashSet<>();
 
     @OneToMany(mappedBy = "conversation", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Message> messages;
+    private Set<Message> messages = new HashSet<>();
 
-    @PrePersist
-    protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
+    public boolean hasParticipant(User user) {
+        return participants.contains(user);
     }
 }
