@@ -72,6 +72,10 @@ public class SecurityConfig {
                                 "/actuator/info"
                         ).permitAll()
 
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/users/availability"
+                        ).permitAll()
+
                         .requestMatchers(HttpMethod.POST,
                                 "/api/auth/login",
                                 "/api/auth/refresh",

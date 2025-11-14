@@ -50,7 +50,10 @@ public enum ErrorCode {
     // COMMENT (1300–1399)
     COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "1300", "댓글을 찾을 수 없습니다."),
     INVALID_COMMENT_THREAD(HttpStatus.BAD_REQUEST, "1301", "잘못된 댓글 스레드 구조입니다."),
-    ALREADY_LIKED_COMMENT(HttpStatus.CONFLICT, "1302", "이미 좋아요를 누른 상태입니다."),
+    COMMENT_DELETE_NOT_ALLOWED(HttpStatus.FORBIDDEN, "1302", "댓글을 삭제할 권한이 없습니다."),
+    COMMENT_CONTENT_INVALID(HttpStatus.BAD_REQUEST, "1303", "댓글 내용이 올바르지 않습니다."),
+    ALREADY_LIKED_COMMENT(HttpStatus.CONFLICT, "1304", "이미 좋아요를 누른 상태입니다."),
+    ALREADY_REPORTED_COMMENT(HttpStatus.CONFLICT, "1305", "이미 접수된 신고가 있습니다."),
 
     // NOTIFICATION (1400–1499)
     NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "1400", "알림을 찾을 수 없습니다."),
@@ -74,7 +77,15 @@ public enum ErrorCode {
         this.message = message;
     }
 
-    public HttpStatus httpStatus() { return httpStatus; }
-    public String code() { return code; }
-    public String message() { return message; }
+    public HttpStatus httpStatus() {
+        return httpStatus;
+    }
+
+    public String code() {
+        return code;
+    }
+
+    public String message() {
+        return message;
+    }
 }
