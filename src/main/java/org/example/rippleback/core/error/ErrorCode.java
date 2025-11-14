@@ -32,9 +32,9 @@ public enum ErrorCode {
     TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "1103", "인증 토큰이 만료되었습니다."),
     TOKEN_TYPE_INVALID(HttpStatus.UNAUTHORIZED, "1104", "토큰 타입이 올바르지 않습니다."),
     DEVICE_MISMATCH(HttpStatus.UNAUTHORIZED, "1105", "디바이스 정보가 일치하지 않습니다."),
-    REFRESH_NOT_FOUND(HttpStatus.UNAUTHORIZED, "1106", "RT가 존재하지 않습니다."),
-    REFRESH_MISMATCH(HttpStatus.UNAUTHORIZED, "1107", "RT 정보가 일치하지 않습니다."),
-    REFRESH_REUSED(HttpStatus.UNAUTHORIZED, "1108", "RT 재사용이 감지되었습니다."),
+    REFRESH_TOKEN_NOT_FOUND(HttpStatus.UNAUTHORIZED, "1106", "RT가 존재하지 않습니다."),
+    REFRESH_TOKEN_MISMATCH(HttpStatus.UNAUTHORIZED, "1107", "RT 정보가 일치하지 않습니다."),
+    REFRESH_TOKEN_REUSED(HttpStatus.UNAUTHORIZED, "1108", "RT 재사용이 감지되었습니다."),
     SESSION_INVALIDATED(HttpStatus.UNAUTHORIZED, "1109", "세션이 무효화되었습니다."),
 
     // POST (1200–1299)
@@ -77,7 +77,15 @@ public enum ErrorCode {
         this.message = message;
     }
 
-    public HttpStatus httpStatus() { return httpStatus; }
-    public String code() { return code; }
-    public String message() { return message; }
+    public HttpStatus httpStatus() {
+        return httpStatus;
+    }
+
+    public String code() {
+        return code;
+    }
+
+    public String message() {
+        return message;
+    }
 }
