@@ -6,10 +6,10 @@ import lombok.RequiredArgsConstructor;
 import org.example.rippleback.core.error.BusinessException;
 import org.example.rippleback.core.error.ErrorCode;
 import org.example.rippleback.core.error.exceptions.user.*;
+import org.example.rippleback.features.feed.domain.FeedStatus;
+import org.example.rippleback.features.feed.infra.FeedRepository;
 import org.example.rippleback.features.media.domain.Media;
 import org.example.rippleback.features.media.infra.MediaRepository;
-import org.example.rippleback.features.post.domain.PostStatus;
-import org.example.rippleback.features.post.infra.PostRepository;
 import org.example.rippleback.features.user.api.dto.*;
 import org.example.rippleback.features.user.domain.User;
 import org.example.rippleback.features.user.domain.UserBlock;
@@ -36,7 +36,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final UserFollowRepository userFollowRepo;
     private final UserBlockRepository userBlockRepo;
-    private final PostRepository postRepo;
+    private final FeedRepository feedRepo;
     private final MediaRepository mediaRepo;
     private final EmailVerificationService emailVerificationService;
     private final PasswordEncoder passwordEncoder;
@@ -84,7 +84,7 @@ public class UserService {
         User u = userRepository.findById(id).orElseThrow(UserNotFoundException::new);
         if (u.getStatus() != UserStatus.ACTIVE) throw new UserNotFoundException();
 
-        long posts = postRepo.countByAuthorIdAndStatus(id, PostStatus.PUBLISHED);
+        long posts = feedRepo.countByAuthorIdAndStatus(id, FeedStatus.PUBLISHED);
         long followers = userFollowRepo.countByFollowingId(id);
         long followings = userFollowRepo.countByFollowerId(id);
 
@@ -98,7 +98,7 @@ public class UserService {
         if (u.getStatus() != UserStatus.ACTIVE) throw new BusinessException(ErrorCode.USER_NOT_FOUND, "비활성화된 계정입니다.");
 
         long id = u.getId();
-        long posts = postRepo.countByAuthorIdAndStatus(id, PostStatus.PUBLISHED);
+        long posts = feedRepo.countByAuthorIdAndStatus(id, FeedStatus.PUBLISHED);
         long followers = userFollowRepo.countByFollowingId(id);
         long followings = userFollowRepo.countByFollowerId(id);
 
@@ -149,7 +149,7 @@ public class UserService {
             case CLEAR -> me.clearProfileImage();
             case KEEP -> { /* no-op */ }
         }
-        long posts = postRepo.countByAuthorIdAndStatus(meId, PostStatus.PUBLISHED);
+        long posts = feedRepo.countByAuthorIdAndStatus(meId, FeedStatus.PUBLISHED);
         long followers = userFollowRepo.countByFollowingId(meId);
         long followings = userFollowRepo.countByFollowerId(meId);
 
