@@ -29,6 +29,16 @@ public interface UserBlockRepository extends JpaRepository<UserBlock, Long> {
                                Pageable pageable);
 
 
+    @Query("""
+                select case when count(b) > 0 then true else false end
+                  from UserBlock b
+                 where (b.blockerId = :userA and b.blockedId = :userB)
+                    or (b.blockerId = :userB and b.blockedId = :userA)
+            """)
+    boolean existsBlockBetween(@Param("userA") Long userA,
+                               @Param("userB") Long userB);
+
+
     default boolean existsMeBlockedTarget(Long meId, Long targetId) {
         return existsByBlockerIdAndBlockedId(meId, targetId);
     }

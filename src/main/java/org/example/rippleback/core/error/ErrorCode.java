@@ -37,13 +37,13 @@ public enum ErrorCode {
     REFRESH_TOKEN_REUSED(HttpStatus.UNAUTHORIZED, "1108", "RT 재사용이 감지되었습니다."),
     SESSION_INVALIDATED(HttpStatus.UNAUTHORIZED, "1109", "세션이 무효화되었습니다."),
 
-    // POST (1200–1299)
-    POST_NOT_FOUND(HttpStatus.NOT_FOUND, "1200", "포스트를 찾을 수 없습니다."),
+    // FEED (1200–1299)
+    FEED_NOT_FOUND(HttpStatus.NOT_FOUND, "1200", "포스트를 찾을 수 없습니다."),
     INVALID_IMAGE_COUNT(HttpStatus.BAD_REQUEST, "1201", "이미지 입력 형식이 올바르지 않습니다."), // 개수/순서/중복 포괄
     INVALID_VIDEO_COUNT(HttpStatus.BAD_REQUEST, "1202", "포스트당 비디오는 최대 1개까지 허용됩니다."),
     INVALID_VIDEO_DURATION(HttpStatus.BAD_REQUEST, "1203", "비디오 길이는 3–180초 사이여야 합니다."),
     ALREADY_BOOKMARKED(HttpStatus.CONFLICT, "1204", "이미 북마크된 상태입니다."),
-    ALREADY_LIKED_POST(HttpStatus.CONFLICT, "1205", "이미 좋아요를 누른 상태입니다."),
+    ALREADY_LIKED_FEED(HttpStatus.CONFLICT, "1205", "이미 좋아요를 누른 상태입니다."),
     INSUFFICIENT_CREDITS(HttpStatus.BAD_REQUEST, "1206", "잔여 보기 크레딧이 부족합니다."),
     CREDIT_BALANCE_INCONSISTENT(HttpStatus.INTERNAL_SERVER_ERROR, "1207", "피드 크레딧 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."),
 
@@ -54,6 +54,7 @@ public enum ErrorCode {
     COMMENT_CONTENT_INVALID(HttpStatus.BAD_REQUEST, "1303", "댓글 내용이 올바르지 않습니다."),
     ALREADY_LIKED_COMMENT(HttpStatus.CONFLICT, "1304", "이미 좋아요를 누른 상태입니다."),
     ALREADY_REPORTED_COMMENT(HttpStatus.CONFLICT, "1305", "이미 접수된 신고가 있습니다."),
+    COMMENT_REASON_REQUIRED(HttpStatus.BAD_REQUEST, "1306", "notes가 비어 있을 수 없습니다."),
 
     // NOTIFICATION (1400–1499)
     NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "1400", "알림을 찾을 수 없습니다."),

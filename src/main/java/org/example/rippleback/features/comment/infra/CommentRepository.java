@@ -7,7 +7,6 @@ import org.springframework.data.jpa.repository.Query;
 
 public interface CommentRepository extends JpaRepository<Comment, Long> {
 
-    // 좋아요 누르면 이거 호출해서 좋아요 개수 + 1
     @Modifying
     @Query(value = """
                 UPDATE comment
@@ -16,7 +15,6 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
             """, nativeQuery = true)
     int incLikeCount(Long commentId);
 
-    // 마찬가지로 좋아요 개수 -1 ( 최소 0 )
     @Modifying
     @Query(value = """
                 UPDATE comment

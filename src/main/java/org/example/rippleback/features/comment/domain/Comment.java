@@ -5,7 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.example.rippleback.features.post.domain.Post;
+import org.example.rippleback.features.feed.domain.Feed;
 import org.example.rippleback.features.user.domain.User;
 
 import java.time.Instant;
@@ -14,7 +14,7 @@ import java.time.Instant;
 @Table(
         name = "comment",
         indexes = {
-                @Index(name = "ix_comment_post", columnList = "post_id, id ASC"),
+                @Index(name = "ix_comment_feed", columnList = "feed_id, id ASC"),
                 @Index(name = "ix_comment_author", columnList = "author_id, id DESC"),
                 @Index(name = "ix_comment_root", columnList = "root_comment_id, id ASC")
         }
@@ -29,8 +29,8 @@ public class Comment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "post_id", nullable = false)
-    private Long postId;
+    @Column(name = "feed_id", nullable = false)
+    private Long feedId;
 
     @Column(name = "author_id", nullable = false)
     private Long authorId;
@@ -66,8 +66,8 @@ public class Comment {
     private User author;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "post_id", insertable = false, updatable = false)
-    private Post post;
+    @JoinColumn(name = "feed_id", insertable = false, updatable = false)
+    private Feed feed;
 
     /* ===== 도메인 편의 메서드 ===== */
     public void softDelete() {
