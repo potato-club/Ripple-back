@@ -37,7 +37,7 @@ public class AuthController {
             @Valid @RequestBody LoginRequestDto request,
             HttpServletResponse response) {
         var result = authService.login(request);
-        refreshCookieSupport.writeFromToken(response, result.refreshToken()); // ← 여기만!
+        refreshCookieSupport.writeFromToken(response, result.refreshToken());
         return ResponseEntity.ok(new AccessTokenResponseDto(result.accessToken()));
     }
 
