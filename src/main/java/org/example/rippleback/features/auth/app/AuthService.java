@@ -1,7 +1,10 @@
 package org.example.rippleback.features.auth.app;
 
 import lombok.RequiredArgsConstructor;
-import org.example.rippleback.core.error.exceptions.auth.*;
+import org.example.rippleback.core.error.BusinessException;
+import org.example.rippleback.core.error.ErrorCode;
+import org.example.rippleback.core.error.exceptions.auth.DeviceMismatchException;
+import org.example.rippleback.core.error.exceptions.auth.InvalidCredentialsException;
 import org.example.rippleback.core.error.exceptions.user.UserInactiveException;
 import org.example.rippleback.core.error.exceptions.user.UserNotFoundException;
 import org.example.rippleback.features.auth.api.dto.LoginRequestDto;
@@ -63,7 +66,7 @@ public class AuthService {
         String hash = TokenHash.sha256(refresh);
         refreshTokenService.store(userId, request.deviceId(), c.jti(), hash, remainMs);
 
-        user.touchLastLogin(Instant.now(clock)); // ← 세터 대신 도메인 메서드
+        user.touchLastLogin(Instant.now(clock));
 
         return new LoginResponseDto(access, refresh);
     }
@@ -78,25 +81,25 @@ public class AuthService {
         long ver = c.version();
         String jti = c.jti();
         long remainMs = Duration.between(Instant.now(clock), c.exp()).toMillis();
-        if (remainMs <= 0) throw new TokenExpiredException();
+        if (remainMs <= 0) throw new BusinessException(ErrorCode.TOKEN_EXPIRED);
 
         String tokenDevice = c.deviceId();
         if (tokenDevice == null || !tokenDevice.equals(request.deviceId())) {
-            throw new DeviceMismatchException();
+            throw new DeviceMismatchException(request.deviceId(),  tokenDevice);
         }
 
         if (refreshTokenService.isUsed(jti)) {
             userRepository.incrementTokenVersion(userId);
-            throw new RefreshReusedException();
+            throw new BusinessException(ErrorCode.REFRESH_TOKEN_REUSED);
         }
 
         String hash = TokenHash.sha256(provided);
         var entryOpt = refreshTokenService.get(userId, request.deviceId());
-        if (entryOpt.isEmpty()) throw new RefreshNotFoundException();
+        if (entryOpt.isEmpty()) throw new BusinessException(ErrorCode.REFRESH_TOKEN_NOT_FOUND);
         var entry = entryOpt.get();
         if (!entry.jti().equals(jti) || !entry.hash().equals(hash)) {
             refreshTokenService.delete(userId, request.deviceId());
-            throw new RefreshMismatchException();
+            throw new BusinessException(ErrorCode.REFRESH_TOKEN_MISMATCH);
         }
 
         User user = userRepository.findById(userId)
@@ -105,7 +108,7 @@ public class AuthService {
             throw new UserInactiveException();
         }
         if (user.getTokenVersion() != ver) {
-            throw new SessionInvalidatedException();
+            throw new BusinessException(ErrorCode.SESSION_INVALIDATED);
         }
 
         String newAccess = jwtTokenProvider.createAccessToken(userId, ver);
@@ -138,13 +141,13 @@ public class AuthService {
         try {
             var c = jwtTokenProvider.decode(token);
             if (!"refresh".equals(c.tokenType())) {
-                throw new TokenTypeInvalidException();
+                throw new BusinessException(ErrorCode.TOKEN_TYPE_INVALID);
             }
             return c;
         } catch (ExpiredJwtException e) {
-            throw new TokenExpiredException();
+            throw new BusinessException(ErrorCode.TOKEN_EXPIRED);
         } catch (JwtException | IllegalArgumentException e) {
-            throw new TokenInvalidException();
+            throw new BusinessException(ErrorCode.TOKEN_INVALID);
         }
     }
 
