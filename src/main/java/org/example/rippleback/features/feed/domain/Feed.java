@@ -25,8 +25,11 @@ public class Feed {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "author_id", nullable = false)
+    private Long authorId;
+
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "author_id", insertable = false)
+    @JoinColumn(name = "author_id", insertable = false, updatable = false)
     private User author;
 
     @Column(columnDefinition = "text")
