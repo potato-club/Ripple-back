@@ -5,7 +5,6 @@ import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.example.rippleback.core.error.BusinessException;
 import org.example.rippleback.core.error.ErrorCode;
-import org.example.rippleback.core.error.exceptions.user.*;
 import org.example.rippleback.features.feed.domain.FeedStatus;
 import org.example.rippleback.features.feed.infra.FeedRepository;
 import org.example.rippleback.features.media.domain.Media;
@@ -75,14 +74,14 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public MeResponseDto getMe(Long meId) {
-        User u = userRepository.findById(meId).orElseThrow(UserNotFoundException::new);
+        User u = userRepository.findById(meId).orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         return userMapper.toMe(u);
     }
 
     @Transactional(readOnly = true)
     public UserResponseDto getProfileById(Long id) {
-        User u = userRepository.findById(id).orElseThrow(UserNotFoundException::new);
-        if (u.getStatus() != UserStatus.ACTIVE) throw new UserNotFoundException();
+        User u = userRepository.findById(id).orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        if (u.getStatus() != UserStatus.ACTIVE) throw new BusinessException(ErrorCode.USER_NOT_FOUND);
 
         long posts = feedRepo.countByAuthorIdAndStatus(id, FeedStatus.PUBLISHED);
         long followers = userFollowRepo.countByFollowingId(id);
@@ -175,10 +174,10 @@ public class UserService {
 
     @Transactional
     public FollowResponseDto follow(Long meId, Long targetId) {
-        if (meId.equals(targetId)) throw new CannotFollowSelfException();
-        User target = userRepository.findById(targetId).orElseThrow(UserNotFoundException::new);
-        if (target.getStatus() == UserStatus.SUSPENDED) throw new UserInactiveException();
-        if (target.getStatus() == UserStatus.DELETED) throw new UserNotFoundException();
+        if (meId.equals(targetId)) throw new BusinessException(ErrorCode.CANNOT_FOLLOW_SELF);
+        User target = userRepository.findById(targetId).orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        if (target.getStatus() == UserStatus.SUSPENDED) throw new BusinessException(ErrorCode.USER_INACTIVE);
+        if (target.getStatus() == UserStatus.DELETED) throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         if (userBlockRepo.existsMeBlockedTarget(meId, targetId))
             throw new BusinessException(ErrorCode.FOLLOW_NOT_ALLOWED_YOU_BLOCKED_TARGET);
         if (userFollowRepo.existsByFollowerIdAndFollowingId(meId, targetId))
@@ -199,11 +198,11 @@ public class UserService {
 
     @Transactional
     public BlockResponseDto block(Long meId, Long targetId) {
-        if (meId.equals(targetId)) throw new CannotBlockSelfException();
-        User target = userRepository.findById(targetId).orElseThrow(UserNotFoundException::new);
-        if (target.getStatus() == UserStatus.SUSPENDED) throw new UserInactiveException();
-        if (target.getStatus() == UserStatus.DELETED) throw new UserNotFoundException();
-        if (userBlockRepo.existsMeBlockedTarget(meId, targetId)) throw new BlockAlreadyExistsException();
+        if (meId.equals(targetId)) throw new BusinessException(ErrorCode.CANNOT_BLOCK_SELF);
+        User target = userRepository.findById(targetId).orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        if (target.getStatus() == UserStatus.SUSPENDED) throw new BusinessException(ErrorCode.USER_INACTIVE);
+        if (target.getStatus() == UserStatus.DELETED) throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        if (userBlockRepo.existsMeBlockedTarget(meId, targetId)) throw new BusinessException(ErrorCode.BLOCK_ALREADY_EXISTS);
 
         userFollowRepo.deleteLink(meId, targetId);
         userFollowRepo.deleteLink(targetId, meId);
@@ -273,9 +272,9 @@ public class UserService {
     }
 
     private User loadActiveForWrite(Long userId) {
-        User u = userRepository.findById(userId).orElseThrow(UserNotFoundException::new);
-        if (u.getStatus() == UserStatus.SUSPENDED) throw new UserInactiveException();
-        if (u.getStatus() == UserStatus.DELETED) throw new UserNotFoundException();
+        User u = userRepository.findById(userId).orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        if (u.getStatus() == UserStatus.SUSPENDED) throw new BusinessException(ErrorCode.USER_INACTIVE);
+        if (u.getStatus() == UserStatus.DELETED) throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         return u;
     }
 

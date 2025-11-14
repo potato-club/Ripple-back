@@ -16,7 +16,6 @@ public class UserMapper {
     private final MediaUrlResolver url; // key → 공개 URL
 
     private String profileImageUrlOf(User u) {
-        // lazy 연관: u.getProfileMedia()는 트랜잭션 안에서 접근 (지금 서비스 메서드들이 @Transactional 이므로 OK)
         var m = u.getProfileMedia();
         if (m == null) return null;
         var key = m.getObjectKey();
@@ -26,7 +25,7 @@ public class UserMapper {
     public MeResponseDto toMe(User u) {
         return new MeResponseDto(
                 u.getId(), u.getUsername(), u.getEmail(), u.isEmailVerified(),
-                profileImageUrlOf(u),                      // ← 여기서만 URL 조립
+                profileImageUrlOf(u),
                 u.getProfileMessage(),
                 u.getStatus().name(), u.getTokenVersion(),
                 u.getLastLoginAt(), u.getCreatedAt(), u.getUpdatedAt()
@@ -48,7 +47,7 @@ public class UserMapper {
         return new UserSummaryDto(
                 u.getId(),
                 u.getUsername(),
-                profileImageUrlOf(u),                      // ← URL
+                profileImageUrlOf(u),
                 u.getProfileMessage()
         );
     }

@@ -5,10 +5,8 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.example.rippleback.core.error.exceptions.auth.TokenExpiredException;
-import org.example.rippleback.core.error.exceptions.auth.TokenInvalidException;
-import org.example.rippleback.core.error.exceptions.auth.TokenMissingException;
-import org.example.rippleback.core.error.exceptions.auth.TokenTypeInvalidException;
+import org.example.rippleback.core.error.BusinessException;
+import org.example.rippleback.core.error.ErrorCode;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -74,18 +72,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         String authHeader = request.getHeader("Authorization");
         if (authHeader == null || authHeader.isBlank()) {
-            request.setAttribute("auth_error", new TokenMissingException());
+            request.setAttribute("auth_error", new BusinessException(ErrorCode.TOKEN_MISSING));
             filterChain.doFilter(request, response);
             return;
         }
         if (!authHeader.startsWith("Bearer ")) {
-            request.setAttribute("auth_error", new TokenInvalidException());
+            request.setAttribute("auth_error", new BusinessException(ErrorCode.TOKEN_INVALID));
             filterChain.doFilter(request, response);
             return;
         }
         String token = authHeader.substring(7);
         if (token == null || token.isBlank()) {
-            request.setAttribute("auth_error", new TokenInvalidException());
+            request.setAttribute("auth_error", new BusinessException(ErrorCode.TOKEN_INVALID));
             filterChain.doFilter(request, response);
             return;
         }
@@ -97,12 +95,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER")));
                 SecurityContextHolder.getContext().setAuthentication(auth);
             } else {
-                request.setAttribute("auth_error", new TokenTypeInvalidException());
+                request.setAttribute("auth_error", new BusinessException(ErrorCode.TOKEN_TYPE_INVALID));
             }
         } catch (io.jsonwebtoken.ExpiredJwtException e) {
-            request.setAttribute("auth_error", new TokenExpiredException());
+            request.setAttribute("auth_error", new BusinessException(ErrorCode.TOKEN_EXPIRED));
         } catch (io.jsonwebtoken.JwtException | IllegalArgumentException e) {
-            request.setAttribute("auth_error", new TokenInvalidException());
+            request.setAttribute("auth_error", new BusinessException(ErrorCode.TOKEN_INVALID));
         }
         filterChain.doFilter(request, response);
     }

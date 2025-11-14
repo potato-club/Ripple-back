@@ -3,8 +3,6 @@ package org.example.rippleback.features.auth.app;
 import lombok.RequiredArgsConstructor;
 import org.example.rippleback.core.error.BusinessException;
 import org.example.rippleback.core.error.ErrorCode;
-import org.example.rippleback.core.error.exceptions.user.UserInactiveException;
-import org.example.rippleback.core.error.exceptions.user.UserNotFoundException;
 import org.example.rippleback.features.auth.api.dto.LoginRequestDto;
 import org.example.rippleback.features.auth.api.dto.LoginResponseDto;
 import org.example.rippleback.features.auth.api.dto.TokenRequestDto;
@@ -51,7 +49,7 @@ public class AuthService {
         User user = userRepository.findByUsernameIgnoreCaseAndDeletedAtIsNull(request.username())
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_CREDENTIALS));
 
-        if (user.getStatus() != UserStatus.ACTIVE) throw new UserInactiveException();
+        if (user.getStatus() != UserStatus.ACTIVE) throw new BusinessException(ErrorCode.USER_INACTIVE);
 
         Long userId = user.getId();
         long ver = user.getTokenVersion();
@@ -101,9 +99,9 @@ public class AuthService {
         }
 
         User user = userRepository.findById(userId)
-                .orElseThrow(UserNotFoundException::new);
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         if (user.getStatus() != UserStatus.ACTIVE) {
-            throw new UserInactiveException();
+            throw new BusinessException(ErrorCode.USER_INACTIVE);
         }
         if (user.getTokenVersion() != ver) {
             throw new BusinessException(ErrorCode.SESSION_INVALIDATED);
