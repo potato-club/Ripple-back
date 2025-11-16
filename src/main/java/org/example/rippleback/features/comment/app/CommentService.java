@@ -108,7 +108,7 @@ public class CommentService {
     }
 
     @Transactional
-    public Long report(Long reporterId,
+    public CommentReport  report(Long reporterId,
                        Long commentId,
                        ReportCategory category,
                        String reason) {
@@ -152,16 +152,12 @@ public class CommentService {
                         .build()
         );
 
-        return saved.getId();
+        return saved;
     }
 
-    private void assertFeedVisibleToMeOr404(Feed feed, Long me) {
+    private void assertFeedVisibleToMeOr404(Feed feed, Long me) { // 가시성 관련
         if (feed.getStatus() != FeedStatus.PUBLISHED) {
             throw new BusinessException(ErrorCode.FEED_NOT_FOUND);
         }
-        // TODO:
-        // - visibility(FOLLOWERS/PRIVATE) + 팔로우/차단 상태에 따른 가시성
-        // - block(user_block) 여부
-        // 를 여기에서 추가한 뒤에도, 실패 시엔 동일하게 POST_NOT_FOUND로 마스킹하면 됨.
     }
 }
