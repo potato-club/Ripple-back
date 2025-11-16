@@ -65,8 +65,6 @@ public class CommentController {
                                                   @Validated @RequestBody CommentReportRequestDto request,
                                                   @AuthenticationPrincipal Long meId
     ) {
-
-
         CommentReport report = commentService.report(
                 meId,
                 commentId,

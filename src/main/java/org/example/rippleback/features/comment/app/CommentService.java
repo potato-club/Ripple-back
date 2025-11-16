@@ -25,17 +25,17 @@ public class CommentService {
     private final FeedRepository feedRepo;
 
     @Transactional
-    public Comment create(Long authorId, Long feedId, Long parentId, String content) {
-        if (content == null || content.isBlank() || content.length() > 300) {
+    public Comment create(Long authorId, Long postId, Long parentId, String content) {
+        if (content == null || content.isBlank() || content.length() > 3000) {
             throw new BusinessException(ErrorCode.COMMENT_CONTENT_INVALID);
         }
 
-        Feed feed = feedRepo.findById(feedId)
+        Feed post = feedRepo.findById(postId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FEED_NOT_FOUND));
-
-        assertFeedVisibleToMeOr404(feed, authorId);
+        assertFeedVisibleToMeOr404(post, authorId);
 
         Long rootId = null;
+
         if (parentId != null) {
             Comment parent = commentRepo.findById(parentId)
                     .orElseThrow(() -> new BusinessException(ErrorCode.COMMENT_NOT_FOUND));
@@ -44,17 +44,19 @@ public class CommentService {
                 throw new BusinessException(ErrorCode.COMMENT_NOT_FOUND);
             }
 
-            if (!parent.getFeedId().equals(feedId)) {
+            if (parent.getParentCommentId() != null) {
                 throw new BusinessException(ErrorCode.INVALID_COMMENT_THREAD);
             }
 
-            rootId = (parent.getRootCommentId() != null)
-                    ? parent.getRootCommentId()
-                    : parent.getId();
+            if (!parent.getFeedId().equals(postId)) {
+                throw new BusinessException(ErrorCode.INVALID_COMMENT_THREAD);
+            }
+
+            rootId = parent.getId();
         }
 
         Comment saved = commentRepo.save(Comment.builder()
-                .feedId(feedId)
+                .feedId(postId)
                 .authorId(authorId)
                 .parentCommentId(parentId)
                 .rootCommentId(rootId)
@@ -63,10 +65,10 @@ public class CommentService {
                 .createdAt(Instant.now())
                 .build());
 
-        feedRepo.incrementCommentCount(feedId);
-
+        feedRepo.incrementCommentCount(postId);
         return saved;
     }
+
 
     @Transactional
     public void delete(Long authorId, Long commentId) {
