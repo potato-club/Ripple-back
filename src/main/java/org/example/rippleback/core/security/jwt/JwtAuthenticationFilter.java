@@ -30,7 +30,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             "/api/auth/refresh",
             "/api/users",
             "/api/users/email/verification/send",
-            "/api/users/email/verification/verify"
+            "/api/users/email/verification/verify",
+            "/api/users/availability"
     );
 
     private static final String[] SKIP_PREFIX = new String[] {
