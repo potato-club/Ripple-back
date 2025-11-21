@@ -19,6 +19,7 @@ import static org.example.rippleback.core.error.ErrorCode.*;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponse> handleBusiness(BusinessException e) {
         ErrorCode ec = e.errorCode();

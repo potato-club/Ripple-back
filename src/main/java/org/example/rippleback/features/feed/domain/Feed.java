@@ -7,6 +7,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -40,6 +41,15 @@ public class Feed {
     @Builder.Default
     private String[] tagsNorm = new String[0];
 
+    @ManyToMany(fetch = FetchType.LAZY, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinTable(
+            name = "feed_tags",
+            joinColumns = @JoinColumn(name = "feed_id"),
+            inverseJoinColumns = @JoinColumn(name = "tag_id")
+    )
+    @Builder.Default
+    private List<FeedTag> tags = new ArrayList<>();
+
     @Column(name = "created_at", columnDefinition = "TIMESTAMPZ", nullable = false)
     @Builder.Default
     private Instant createdAt = Instant.now();
@@ -64,6 +74,7 @@ public class Feed {
     @CollectionTable(name = "feed_media_keys", joinColumns = @JoinColumn(name = "feed_id"))
     @Column(name = "media_key")
     private List<String> mediaKeys;
+    // S3 object key 리스트 ; "videos/12345" or "images/abcde.jpg" 등
 
     @Enumerated(EnumType.STRING)
     @Column(length = 16, nullable = false)
@@ -110,17 +121,35 @@ public class Feed {
 
     public void publish() {
         this.status = FeedStatus.PUBLISHED;
-        this.updatedAt = Instant.now();
+        touchUpdatedAt();
     }
 
     public void softDelete() {
         this.status = FeedStatus.DELETED;
         this.deletedAt = Instant.now();
-        this.updatedAt = Instant.now();
+        touchUpdatedAt();
     }
 
-    public void changeVisibility(FeedVisibility visibility) {
+    public void updateVisibility(FeedVisibility visibility) {
         this.visibility = visibility;
-        this.updatedAt = Instant.now();
+        touchUpdatedAt();
+    }
+
+    public void updateContent(String content) {
+        this.content = content;
+        touchUpdatedAt();
+    }
+
+    public void updateTags(List<FeedTag> newTags) {
+        this.tags = newTags != null ? newTags : new ArrayList<>();
+        this.tagsNorm = newTags == null ? new String[0] : newTags.stream()
+                .map(FeedTag::getName)
+                .toArray(String[]::new);
+        touchUpdatedAt();
+    }
+
+    public void updateMediaKeys(List<String> mediaKeys) {
+        this.mediaKeys = mediaKeys;
+        touchUpdatedAt();
     }
 }
