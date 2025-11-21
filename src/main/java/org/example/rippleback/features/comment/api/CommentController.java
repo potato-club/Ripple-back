@@ -1,10 +1,7 @@
 package org.example.rippleback.features.comment.api;
 
 import lombok.RequiredArgsConstructor;
-import org.example.rippleback.features.comment.api.dto.CommentCreateRequestDto;
-import org.example.rippleback.features.comment.api.dto.CommentReportRequestDto;
-import org.example.rippleback.features.comment.api.dto.CommentReportResponseDto;
-import org.example.rippleback.features.comment.api.dto.CommentResponseDto;
+import org.example.rippleback.features.comment.api.dto.*;
 import org.example.rippleback.features.comment.app.CommentService;
 import org.example.rippleback.features.comment.domain.Comment;
 import org.example.rippleback.features.comment.domain.CommentReport;
@@ -12,6 +9,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api")
@@ -71,7 +70,36 @@ public class CommentController {
                 request.category(),
                 request.reason()
         );
-
         return CommentReportResponseDto.from(report);
+    }
+
+    @GetMapping("/feeds/{feedId}/comments")
+    public CommentPageResponseDto getRootComments(
+            @PathVariable Long feedId,
+            @Validated CommentPageRequestDto request,
+            @AuthenticationPrincipal Long meId
+    ) {
+        return commentService.getRootComments(
+                meId,
+                feedId,
+                request.cursorId(),
+                request.size()
+        );
+    }
+
+    @GetMapping("/feeds/{feedId}/comments/{commentId}/replies")
+    public CommentPageResponseDto getReplies(
+            @PathVariable Long feedId,
+            @PathVariable Long commentId,
+            @Validated CommentPageRequestDto request,
+            @AuthenticationPrincipal Long meId
+    ) {
+        return commentService.getReplies(
+                meId,
+                feedId,
+                commentId,
+                request.cursorId(),
+                request.size()
+        );
     }
 }

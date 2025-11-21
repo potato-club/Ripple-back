@@ -1,7 +1,7 @@
 package org.example.rippleback.features.comment.infra;
 
 import org.example.rippleback.features.comment.domain.CommentReport;
-import org.example.rippleback.features.comment.domain.ReportStatus;
+import org.example.rippleback.features.comment.domain.CommentReportStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -14,10 +14,20 @@ public interface CommentReportRepository extends JpaRepository<CommentReport, Lo
 
     boolean existsByReporterIdAndCommentId(Long reporterId, Long commentId);
 
-    Page<CommentReport> findByStatusOrderByCreatedAtDesc(ReportStatus status, Pageable pageable);
+    Page<CommentReport> findByStatusOrderByCreatedAtDesc(CommentReportStatus status, Pageable pageable);
 
     Page<CommentReport> findByReporterIdOrderByCreatedAtDesc(Long reporterId, Pageable pageable);
 
     @Modifying(clearAutomatically = true)
     int deleteByReporterIdAndCommentId(Long reporterId, Long commentId);
+
+    Page<CommentReport> findByCommentIdOrderByCreatedAtDesc(Long commentId, Pageable pageable);
+
+
+    Page<CommentReport> findByCommentIdAndStatusOrderByCreatedAtDesc(
+            Long commentId,
+            CommentReportStatus status,
+            Pageable pageable
+    );
+
 }

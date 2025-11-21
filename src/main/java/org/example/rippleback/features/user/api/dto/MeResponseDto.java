@@ -8,7 +8,6 @@ public record MeResponseDto(
         String email,
         boolean emailVerified,
         String profileImageUrl,
-        String profileMessage,
         String status,          // "ACTIVE" | "SUSPENDED" | "DELETED"
         Long tokenVersion,
         Instant lastLoginAt,

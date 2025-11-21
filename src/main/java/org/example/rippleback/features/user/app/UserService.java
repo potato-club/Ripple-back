@@ -127,9 +127,6 @@ public class UserService {
                 me.changeUsername(nu);
             }
         }
-        if (req.profileMessage() != null) {
-            me.changeProfileMessage(req.profileMessage());
-        }
 
         var img = req.profileImage();
         var action = (img == null || img.action() == null)

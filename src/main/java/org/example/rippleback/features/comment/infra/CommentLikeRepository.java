@@ -29,4 +29,11 @@ public interface CommentLikeRepository extends JpaRepository<CommentLike, Long> 
                 )
             """, nativeQuery = true)
     boolean existsByUserAndComment(Long userId, Long commentId);
+
+    @Modifying
+    @Query(value = """
+                DELETE FROM comment_like
+                WHERE comment_id = ?1
+            """, nativeQuery = true)
+    int deleteAllByCommentId(Long commentId);
 }

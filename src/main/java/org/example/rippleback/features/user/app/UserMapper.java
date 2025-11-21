@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class UserMapper {
 
-    private final MediaUrlResolver url; // key → 공개 URL
+    private final MediaUrlResolver url;
 
     private String profileImageUrlOf(User u) {
         var m = u.getProfileMedia();
@@ -26,7 +26,6 @@ public class UserMapper {
         return new MeResponseDto(
                 u.getId(), u.getUsername(), u.getEmail(), u.isEmailVerified(),
                 profileImageUrlOf(u),
-                u.getProfileMessage(),
                 u.getStatus().name(), u.getTokenVersion(),
                 u.getLastLoginAt(), u.getCreatedAt(), u.getUpdatedAt()
         );
@@ -47,8 +46,7 @@ public class UserMapper {
         return new UserSummaryDto(
                 u.getId(),
                 u.getUsername(),
-                profileImageUrlOf(u),
-                u.getProfileMessage()
+                profileImageUrlOf(u)
         );
     }
 

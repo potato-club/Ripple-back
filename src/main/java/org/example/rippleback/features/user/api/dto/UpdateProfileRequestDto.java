@@ -2,17 +2,12 @@ package org.example.rippleback.features.user.api.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
 
 @Schema(description = "프로필 수정 요청(닉네임/메시지/이미지 SET|CLEAR|KEEP)")
 public record UpdateProfileRequestDto(
         @Schema(example = "neo_21")
         @Pattern(regexp = "^[a-zA-Z0-9_]{3,20}$", message = "영문/숫자/밑줄 3~20자")
         String username,
-
-        @Schema(example = "hello world")
-        @Size(max = 255)
-        String profileMessage,
 
         @Schema(description = "프로필 이미지 패치 (null이면 KEEP과 동일)")
         UpdateProfileRequestDto.ProfileImagePatch profileImage
