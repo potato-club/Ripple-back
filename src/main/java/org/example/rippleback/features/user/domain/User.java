@@ -46,9 +46,6 @@ public class User {
     @JoinColumn(name = "profile_media_id", insertable = false, updatable = false)
     private Media profileMedia;
 
-    @Column(name = "profile_message", length = 255)
-    private String profileMessage;
-
     @Builder.Default
     @Column(name = "is_email_verified", nullable = false)
     private boolean emailVerified = false;
@@ -82,10 +79,6 @@ public class User {
 
     public void changeUsername(String newUsername) {
         this.username = newUsername;
-    }
-
-    public void changeProfileMessage(String newMessage) {
-        this.profileMessage = newMessage;
     }
 
     public void updateProfileImage(Long mediaId) {

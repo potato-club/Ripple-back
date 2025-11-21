@@ -23,11 +23,9 @@ public class Media {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /** 업로더(소유자) */
     @Column(name = "owner_id", nullable = false)
     private Long ownerId;
 
-    /** IMAGE | VIDEO */
     @Enumerated(EnumType.STRING)
     @Column(name = "media_type", length = 10, nullable = false)
     private MediaType mediaType;
@@ -51,7 +49,6 @@ public class Media {
     @Column(name = "size_bytes")
     private Long sizeBytes;
 
-    /** 파일 준비 상태 */
     @Enumerated(EnumType.STRING)
     @Column(name = "media_status", length = 16, nullable = false)
     @Builder.Default
@@ -61,7 +58,6 @@ public class Media {
     @Column(name = "created_at", columnDefinition = "TIMESTAMPTZ", nullable = false, updatable = false)
     private Instant createdAt;
 
-    /* 편의 */
     public boolean isImage() { return mediaType == MediaType.IMAGE; }
     public boolean isVideo() { return mediaType == MediaType.VIDEO; }
 

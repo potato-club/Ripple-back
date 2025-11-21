@@ -3,38 +3,55 @@ package org.example.rippleback.features.comment.app;
 import lombok.RequiredArgsConstructor;
 import org.example.rippleback.core.error.BusinessException;
 import org.example.rippleback.core.error.ErrorCode;
+import org.example.rippleback.features.comment.api.dto.CommentPageResponseDto;
+import org.example.rippleback.features.comment.api.dto.CommentResponseDto;
 import org.example.rippleback.features.comment.domain.*;
 import org.example.rippleback.features.comment.infra.CommentLikeRepository;
 import org.example.rippleback.features.comment.infra.CommentReportRepository;
 import org.example.rippleback.features.comment.infra.CommentRepository;
 import org.example.rippleback.features.feed.domain.Feed;
 import org.example.rippleback.features.feed.domain.FeedStatus;
+import org.example.rippleback.features.feed.domain.FeedVisibility;
 import org.example.rippleback.features.feed.infra.FeedRepository;
+import org.example.rippleback.features.user.api.dto.UserSummaryDto;
+import org.example.rippleback.features.user.app.UserMapper;
+import org.example.rippleback.features.user.domain.User;
+import org.example.rippleback.features.user.infra.UserRepository;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class CommentService {
 
+    private final UserRepository userRepo;
     private final CommentRepository commentRepo;
     private final CommentLikeRepository commentLikeRepo;
     private final CommentReportRepository commentReportRepo;
     private final FeedRepository feedRepo;
+    private final UserMapper userMapper;
 
     @Transactional
-    public Comment create(Long authorId, Long postId, Long parentId, String content) {
+    public Comment create(Long authorId, Long feedId, Long parentId, String content) {
         if (content == null || content.isBlank() || content.length() > 3000) {
             throw new BusinessException(ErrorCode.COMMENT_CONTENT_INVALID);
         }
 
-        Feed post = feedRepo.findById(postId)
+        Feed post = feedRepo.findById(feedId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FEED_NOT_FOUND));
         assertFeedVisibleToMeOr404(post, authorId);
 
         Long rootId = null;
+        Long replyToUserId = null;
+
 
         if (parentId != null) {
             Comment parent = commentRepo.findById(parentId)
@@ -44,28 +61,28 @@ public class CommentService {
                 throw new BusinessException(ErrorCode.COMMENT_NOT_FOUND);
             }
 
-            if (parent.getParentCommentId() != null) {
+            if (!parent.getFeedId().equals(feedId)) {
                 throw new BusinessException(ErrorCode.INVALID_COMMENT_THREAD);
             }
 
-            if (!parent.getFeedId().equals(postId)) {
-                throw new BusinessException(ErrorCode.INVALID_COMMENT_THREAD);
-            }
+            rootId = (parent.getRootCommentId() == null)
+                    ? parent.getId()
+                    : parent.getRootCommentId();
 
-            rootId = parent.getId();
+            replyToUserId = parent.getAuthorId();
         }
 
         Comment saved = commentRepo.save(Comment.builder()
-                .feedId(postId)
+                .feedId(feedId)
                 .authorId(authorId)
-                .parentCommentId(parentId)
                 .rootCommentId(rootId)
+                .replyToUserId(replyToUserId)
                 .content(content)
                 .status(CommentStatus.PUBLISHED)
                 .createdAt(Instant.now())
                 .build());
 
-        feedRepo.incrementCommentCount(postId);
+        feedRepo.incrementCommentCount(feedId);
         return saved;
     }
 
@@ -75,15 +92,34 @@ public class CommentService {
         Comment c = commentRepo.findById(commentId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.COMMENT_NOT_FOUND));
 
+        if (c.isDeleted()) {
+            throw new BusinessException(ErrorCode.COMMENT_NOT_FOUND);
+        }
+
         if (!c.getAuthorId().equals(authorId)) {
             throw new BusinessException(ErrorCode.COMMENT_DELETE_NOT_ALLOWED);
         }
 
-        if (!c.isDeleted()) {
-            c.softDelete();
-            commentRepo.save(c);
-            feedRepo.decrementCommentCount(c.getFeedId());
+        boolean isRoot = c.isRoot();
+        if (isRoot) {
+            boolean hasVisibleChild =
+                    commentRepo.existsByRootCommentIdAndVisibility(
+                            c.getId(),
+                            CommentVisibility.VISIBLE
+                    );
+
+            if (hasVisibleChild) {
+                c.markDeletedButVisibleWithMask();
+            } else {
+                c.markDeletedHidden();
+            }
+        } else {
+            c.markDeletedHidden();
         }
+
+        commentLikeRepo.deleteAllByCommentId(commentId);
+        feedRepo.decrementCommentCount(c.getFeedId());
+        commentRepo.save(c);
     }
 
     @Transactional
@@ -103,18 +139,6 @@ public class CommentService {
 
     @Transactional
     public void unlike(Long authorId, Long commentId) {
-        int deleted = commentLikeRepo.deleteOne(authorId, commentId);
-        if (deleted > 0) {
-            commentRepo.decLikeCount(commentId);
-        }
-    }
-
-    @Transactional
-    public CommentReport  report(Long reporterId,
-                       Long commentId,
-                       ReportCategory category,
-                       String reason) {
-
         Comment c = commentRepo.findById(commentId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.COMMENT_NOT_FOUND));
 
@@ -122,11 +146,24 @@ public class CommentService {
             throw new BusinessException(ErrorCode.COMMENT_NOT_FOUND);
         }
 
-        boolean alreadyReported =
-                commentReportRepo.existsByReporterIdAndCommentId(reporterId, commentId);
+        int deleted = commentLikeRepo.deleteOne(authorId, commentId);
+        if (deleted > 0) {
+            commentRepo.decLikeCount(commentId);
+        }
+    }
 
-        if (alreadyReported) {
-            throw new BusinessException(ErrorCode.ALREADY_REPORTED_COMMENT);
+
+    @Transactional
+    public CommentReport report(Long reporterId,
+                                Long commentId,
+                                CommentReportCategory category,
+                                String reason) {
+
+        Comment c = commentRepo.findById(commentId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.COMMENT_NOT_FOUND));
+
+        if (c.isDeleted()) {
+            throw new BusinessException(ErrorCode.COMMENT_NOT_FOUND);
         }
 
         var existingOpt = commentReportRepo.findByReporterIdAndCommentId(reporterId, commentId);
@@ -136,8 +173,8 @@ public class CommentService {
 
             String customMessage = switch (existing.getStatus()) {
                 case REVIEWING -> "이미 신고가 접수되어 검토 중입니다.";
-                case RESOLVED  -> "이미 처리된 신고입니다.";
-                case REJECTED  -> existing.getNotes();
+                case RESOLVED -> "이미 처리된 신고입니다.";
+                case REJECTED -> existing.getNotes();
             };
 
             throw new BusinessException(ErrorCode.ALREADY_REPORTED_COMMENT, customMessage);
@@ -149,7 +186,7 @@ public class CommentService {
                         .commentId(commentId)
                         .category(category)
                         .reason(reason)
-                        .status(ReportStatus.REVIEWING)
+                        .status(CommentReportStatus.REVIEWING)
                         .createdAt(Instant.now())
                         .build()
         );
@@ -157,9 +194,95 @@ public class CommentService {
         return saved;
     }
 
-    private void assertFeedVisibleToMeOr404(Feed feed, Long me) { // 가시성 관련
+    @Transactional(readOnly = true)
+    public CommentPageResponseDto getRootComments(
+            Long viewerId,
+            Long feedId,
+            Long cursorId,
+            int size
+    ) {
+        Feed feed = feedRepo.findById(feedId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.FEED_NOT_FOUND));
+        assertFeedVisibleToMeOr404(feed, viewerId);
+
+        Pageable pageable = PageRequest.of(0, size);
+        List<Comment> comments = commentRepo.findRootComments(feedId, cursorId, pageable);
+
+        Set<Long> authorIds = comments.stream()
+                .map(Comment::getAuthorId)
+                .collect(Collectors.toSet());
+
+        List<User> users = userRepo.findByIdInAndDeletedAtIsNull(authorIds);
+
+        Map<Long, UserSummaryDto> authorMap = users.stream()
+                .map(userMapper::toSummary)
+                .collect(Collectors.toMap(UserSummaryDto::id, it -> it));
+
+        List<CommentResponseDto> dtos = comments.stream()
+                .map(c -> CommentResponseDto.from(c, authorMap.get(c.getAuthorId())))
+                .toList();
+        Long nextCursor = comments.isEmpty()
+                ? null
+                : comments.getLast().getId();
+
+        boolean hasNext = comments.size() == size;
+
+        return new CommentPageResponseDto(dtos, nextCursor, hasNext);
+    }
+
+    @Transactional(readOnly = true)
+    public CommentPageResponseDto getReplies(
+            Long viewerId,
+            Long feedId,
+            Long rootCommentId,
+            Long cursorId,
+            int size
+    ) {
+        Feed feed = feedRepo.findById(feedId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.FEED_NOT_FOUND));
+        assertFeedVisibleToMeOr404(feed, viewerId);
+
+        Comment root = commentRepo.findById(rootCommentId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.COMMENT_NOT_FOUND));
+        if (!root.getFeedId().equals(feedId)) {
+            throw new BusinessException(ErrorCode.INVALID_COMMENT_THREAD);
+        }
+
+        Pageable pageable = PageRequest.of(0, size);
+        List<Comment> replies =
+                commentRepo.findReplies(feedId, rootCommentId, cursorId, pageable);
+
+        Set<Long> authorIds = replies.stream()
+                .map(Comment::getAuthorId)
+                .collect(Collectors.toSet());
+
+        List<User> users = userRepo.findByIdInAndDeletedAtIsNull(authorIds);
+
+        Map<Long, UserSummaryDto> authorMap = users.stream()
+                .map(userMapper::toSummary)
+                .collect(Collectors.toMap(UserSummaryDto::id, it -> it));
+
+        List<CommentResponseDto> dtos = replies.stream()
+                .map(c -> CommentResponseDto.from(c, authorMap.get(c.getAuthorId())))
+                .toList();
+        Long nextCursor = replies.isEmpty()
+                ? null
+                : replies.getLast().getId();
+
+        boolean hasNext = replies.size() == size;
+
+        return new CommentPageResponseDto(dtos, nextCursor, hasNext);
+    }
+
+
+    private void assertFeedVisibleToMeOr404(Feed feed, Long userId) {
         if (feed.getStatus() != FeedStatus.PUBLISHED) {
             throw new BusinessException(ErrorCode.FEED_NOT_FOUND);
         }
+
+        if (feed.getVisibility() == FeedVisibility.FOLLOWERS) {
+
+        }
+        // TODO : 유저의 차단 관계 같은 것에 따라서 피드가 유저에게 공개되었는지 같은 것들 설정
     }
 }

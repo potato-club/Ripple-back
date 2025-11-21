@@ -1,6 +1,6 @@
 package org.example.rippleback.features.comment.domain;
 
-public enum ReportStatus {
+public enum CommentReportStatus {
     REVIEWING,
     RESOLVED,
     REJECTED

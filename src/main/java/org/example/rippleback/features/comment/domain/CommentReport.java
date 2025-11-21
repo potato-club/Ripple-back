@@ -13,11 +13,16 @@ import java.time.Instant;
 @Entity
 @Table(
         name = "comment_report",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uq_comment_report_user_comment",
+                columnNames = {"reporter_id", "comment_id"}
+        ),
         indexes = {
                 @Index(name = "ix_comment_report_user", columnList = "reporter_id"),
                 @Index(name = "ix_comment_report_comment", columnList = "comment_id")
         }
 )
+
 @Getter
 @Builder
 @NoArgsConstructor
@@ -36,15 +41,15 @@ public class CommentReport {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "category", length = 64, nullable = false)
-    private ReportCategory category;
-
-    @Column(name = "reason", length = 255)
-    private String reason;
+    private CommentReportCategory category;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 12, nullable = false)
     @Builder.Default
-    private ReportStatus status = ReportStatus.REVIEWING;
+    private CommentReportStatus status = CommentReportStatus.REVIEWING;
+
+    @Column(name = "reason", length = 255)
+    private String reason;
 
     @Column(name = "created_at", nullable = false, columnDefinition = "TIMESTAMPTZ")
     @Builder.Default
@@ -60,7 +65,7 @@ public class CommentReport {
         if (notes == null || notes.isBlank()) {
             throw new BusinessException(ErrorCode.COMMENT_REASON_REQUIRED);
         }
-        this.status = ReportStatus.RESOLVED;
+        this.status = CommentReportStatus.RESOLVED;
         this.processedAt = Instant.now();
         this.notes = notes;
     }
@@ -69,7 +74,7 @@ public class CommentReport {
         if (notes == null || notes.isBlank()) {
             throw new BusinessException(ErrorCode.COMMENT_REASON_REQUIRED);
         }
-        this.status = ReportStatus.REJECTED;
+        this.status = CommentReportStatus.REJECTED;
         this.processedAt = Instant.now();
         this.notes = notes;
     }

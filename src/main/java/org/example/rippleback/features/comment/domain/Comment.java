@@ -35,11 +35,14 @@ public class Comment {
     @Column(name = "author_id", nullable = false)
     private Long authorId;
 
-    @Column(name = "parent_comment_id")
-    private Long parentCommentId;
-
     @Column(name = "root_comment_id")
     private Long rootCommentId;
+
+    @Column(name = "to_user_id")
+    Long replyToUserId;
+
+    @Column(name = "to_comment_id")
+    Long replyToCommentId;
 
     @Column(name = "content", nullable = false, columnDefinition = "text")
     private String content;
@@ -48,6 +51,11 @@ public class Comment {
     @Column(name = "status", length = 16, nullable = false)
     @Builder.Default
     private CommentStatus status = CommentStatus.PUBLISHED;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "visiblity", length = 16, nullable = false)
+    @Builder.Default
+    private CommentVisibility visibility = CommentVisibility.VISIBLE;
 
     @Column(name = "like_count", nullable = false)
     @Builder.Default
@@ -60,7 +68,6 @@ public class Comment {
     @Column(name = "deleted_at", columnDefinition = "TIMESTAMPTZ")
     private Instant deletedAt;
 
-    /* ===== 읽기전용 연관(선택) ===== */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id", insertable = false, updatable = false)
     private User author;
@@ -69,9 +76,23 @@ public class Comment {
     @JoinColumn(name = "feed_id", insertable = false, updatable = false)
     private Feed feed;
 
-    /* ===== 도메인 편의 메서드 ===== */
-    public void softDelete() {
+    public boolean isRoot() {
+        return rootCommentId == null;
+    }
+
+    public boolean isVisible() {
+        return visibility == CommentVisibility.VISIBLE;
+    }
+
+    public void markDeletedHidden() {
         this.status = CommentStatus.DELETED;
+        this.visibility = CommentVisibility.HIDDEN;
+        this.deletedAt = Instant.now();
+    }
+
+    public void markDeletedButVisibleWithMask() {
+        this.status = CommentStatus.DELETED;
+        this.visibility = CommentVisibility.VISIBLE;
         this.deletedAt = Instant.now();
     }
 
