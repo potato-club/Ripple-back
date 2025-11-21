@@ -37,4 +37,12 @@ public class SwaggerConfig {
                 .pathsToMatch("/api/users/**")
                 .build();
     }
+
+    @Bean
+    public GroupedOpenApi commentApi() {
+        return GroupedOpenApi.builder()
+                .group("comments")
+                .pathsToMatch("/api/feeds/**/comments/**")
+                .build();
+    }
 }

@@ -49,11 +49,10 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region:            ${{ secrets.AWS_REGION }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-      # 1) 러너 퍼블릭 IP를 /32로 SG:22에 임시 허용
       - name: Allow runner IP on SG:22
         id: ipopen
         shell: bash
@@ -65,7 +64,6 @@ jobs:
             --ip-permissions "IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges=[{CidrIp=${RUNNER_IP}/32,Description=gh-actions-temp}]" \
           || true
 
-      # 2) SSH로 배포
       - name: SSH to EC2 and deploy
         uses: appleboy/ssh-action@v1.0.3
         with:

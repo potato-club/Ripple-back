@@ -13,4 +13,5 @@ public record LoginRequestDto(
 
         @NotBlank(message = "디바이스 ID가 팔요합니다.")
         String deviceId
-) {}
+) {
+}

@@ -13,32 +13,32 @@ import java.time.Instant;
 @Builder
 @Entity
 @Table(
-        name = "user_block",
-        uniqueConstraints = @UniqueConstraint(name = "uq_user_block", columnNames = {"from_user_id", "to_user_id"}),
+        name = "user_follow",
+        uniqueConstraints = @UniqueConstraint(name = "uq_user_follow", columnNames = {"from_user_id", "to_user_id"}),
         indexes = {
-                @Index(name = "idx_block_from", columnList = "from_user_id"),
-                @Index(name = "idx_block_to", columnList = "to_user_id")
+                @Index(name = "idx_follow_from", columnList = "from_user_id"),
+                @Index(name = "idx_follow_to", columnList = "to_user_id")
         }
 )
 @Check(constraints = "from_user_id <> to_user_id")
-public class Block {
+public class UserFollow {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "from_user_id", nullable = false)
-    private User blocker;
+    private User follower;
 
     @Column(name = "from_user_id", insertable = false, updatable = false)
-    private Long blockerId;
+    private Long followerId;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "to_user_id", nullable = false)
-    private User blocked;
+    private User following;
 
     @Column(name = "to_user_id", insertable = false, updatable = false)
-    private Long blockedId;
+    private Long followingId;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

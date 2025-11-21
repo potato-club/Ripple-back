@@ -1,7 +1,9 @@
 package org.example.rippleback.core.error;
 
 
+import org.springframework.core.NestedExceptionUtils;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
@@ -17,49 +19,70 @@ import static org.example.rippleback.core.error.ErrorCode.*;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponse> handleBusiness(BusinessException e) {
-        var ec = e.errorCode();
+        ErrorCode ec = e.errorCode();
         return ResponseEntity.status(ec.httpStatus()).body(ErrorResponse.of(ec));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException e) {
-        var fieldErrors = e.getBindingResult().getFieldErrors(); // 1) S3ObjectKey 위반 있으면 INVALID_OBJECT_KEY로 특화
+        var fieldErrors = e.getBindingResult().getFieldErrors();
+        // S3ObjectKey 위반 있으면 INVALID_OBJECT_KEY로 특화
         boolean objectKeyViolation = fieldErrors.stream().anyMatch(fe -> fe.getCodes() != null && Arrays.stream(fe.getCodes()).anyMatch(code -> code.contains("S3ObjectKey")));
         if (objectKeyViolation) {
-            var ec = INVALID_OBJECT_KEY; // 1601
+            ErrorCode ec = INVALID_OBJECT_KEY;
             return ResponseEntity.status(ec.httpStatus()).body(ErrorResponse.of(ec));
         }
-        // 2) 그 외는 공통 9000
-        var ec = VALIDATION_ERROR;
+
+        // 그 외
+        ErrorCode ec = VALIDATION_ERROR;
         return ResponseEntity.status(ec.httpStatus()).body(ErrorResponse.of(ec));
     }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrity(DataIntegrityViolationException e) {
+        Throwable root = NestedExceptionUtils.getMostSpecificCause(e);
+        String message = root.getMessage();
+
+        // comment_report 유니크 제약 위반인지 확인
+        if (message != null && message.contains("uq_comment_report_user_comment")) {
+            ErrorCode ec = ErrorCode.ALREADY_REPORTED_COMMENT;
+            return ResponseEntity.status(ec.httpStatus())
+                    .body(ErrorResponse.of(ec));
+        }
+
+        // 그 외
+        ErrorCode ec = ErrorCode.DB_ERROR;
+        return ResponseEntity.status(ec.httpStatus()).body(ErrorResponse.of(ec));
+    }
+
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied
             (AccessDeniedException e) {
-        var ec = FORBIDDEN;
+        ErrorCode ec = FORBIDDEN;
         return ResponseEntity.status(ec.httpStatus()).body(ErrorResponse.of(ec));
     }
 
     @ExceptionHandler(DataAccessException.class)
     public ResponseEntity<ErrorResponse> handleData
             (DataAccessException e) {
-        var ec = DB_ERROR;
+        ErrorCode ec = DB_ERROR;
         return ResponseEntity.status(ec.httpStatus()).body(ErrorResponse.of(ec));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(Exception e) {
-        var ec = INTERNAL_SERVER_ERROR;
+        ErrorCode ec = INTERNAL_SERVER_ERROR;
         return ResponseEntity.status(ec.httpStatus()).body(ErrorResponse.of(ec));
     }
 
     @ExceptionHandler({MissingServletRequestParameterException.class, MissingRequestHeaderException.class})
     public ResponseEntity<ErrorResponse> handleMissing
             (Exception e) {
-        var ec = VALIDATION_ERROR;
+        ErrorCode ec = VALIDATION_ERROR;
         return ResponseEntity.status(ec.httpStatus()).body(ErrorResponse.of(ec));
     }
 }

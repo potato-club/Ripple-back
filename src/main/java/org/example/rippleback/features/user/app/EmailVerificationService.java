@@ -1,8 +1,8 @@
 package org.example.rippleback.features.user.app;
 
 import lombok.RequiredArgsConstructor;
-import org.example.rippleback.core.error.exceptions.user.EmailCodeExpiredException;
-import org.example.rippleback.core.error.exceptions.user.EmailCodeInvalidException;
+import org.example.rippleback.core.error.BusinessException;
+import org.example.rippleback.core.error.ErrorCode;
 import org.example.rippleback.infra.mail.EmailSender;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -45,9 +45,9 @@ public class EmailVerificationService {
         String stored = redis.opsForValue().get(key);
         if (stored == null) {
             if (Boolean.TRUE.equals(redis.hasKey(verifiedKey))) return;
-            throw new EmailCodeExpiredException();
+            throw new BusinessException(ErrorCode.EMAIL_CODE_EXPIRED);
         }
-        if (!stored.equals(code)) throw new EmailCodeInvalidException();
+        if (!stored.equals(code)) throw new BusinessException(ErrorCode.EMAIL_CODE_INVALID);
         Long ttl = redis.getExpire(key, TimeUnit.SECONDS);
         if (ttl == null || ttl <= 0) ttl = codeTtlSeconds;
         redis.delete(key);

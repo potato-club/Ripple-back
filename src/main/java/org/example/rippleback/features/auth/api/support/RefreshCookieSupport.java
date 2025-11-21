@@ -14,8 +14,8 @@ import java.time.Instant;
 @Component
 public class RefreshCookieSupport {
     private final AuthCookieProperties props;
-    private final JwtTokenProvider jwt;   // ← 토큰 디코드용
-    private final Clock clock;            // ← 테스트 용이성/일관성
+    private final JwtTokenProvider jwt;
+    private final Clock clock;
 
     public RefreshCookieSupport(AuthCookieProperties props, JwtTokenProvider jwt, Clock clock) {
         this.props = props;
@@ -23,14 +23,12 @@ public class RefreshCookieSupport {
         this.clock = clock;
     }
 
-    /** RT에서 exp를 읽어 Max-Age를 자동 계산해 Set-Cookie 작성 */
     public void writeFromToken(HttpServletResponse res, String refreshToken) {
         var c = jwt.decode(refreshToken);
         long maxAge = Math.max(1, Duration.between(Instant.now(clock), c.exp()).getSeconds());
         write(res, refreshToken, maxAge);
     }
 
-    /** Max-Age를 외부에서 넘겨줄 때 사용할 버전(유지) */
     public void write(HttpServletResponse res, String refreshToken, long maxAgeSeconds) {
         ResponseCookie.ResponseCookieBuilder b = ResponseCookie.from(props.name(), refreshToken)
                 .httpOnly(props.httpOnly())

@@ -3,10 +3,6 @@ package org.example.rippleback.features.auth.app;
 import lombok.RequiredArgsConstructor;
 import org.example.rippleback.core.error.BusinessException;
 import org.example.rippleback.core.error.ErrorCode;
-import org.example.rippleback.core.error.exceptions.auth.DeviceMismatchException;
-import org.example.rippleback.core.error.exceptions.auth.InvalidCredentialsException;
-import org.example.rippleback.core.error.exceptions.user.UserInactiveException;
-import org.example.rippleback.core.error.exceptions.user.UserNotFoundException;
 import org.example.rippleback.features.auth.api.dto.LoginRequestDto;
 import org.example.rippleback.features.auth.api.dto.LoginResponseDto;
 import org.example.rippleback.features.auth.api.dto.TokenRequestDto;
@@ -47,13 +43,13 @@ public class AuthService {
                     new UsernamePasswordAuthenticationToken(request.username(), request.password())
             );
         } catch (BadCredentialsException e) {
-            throw new InvalidCredentialsException();
+            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
 
         User user = userRepository.findByUsernameIgnoreCaseAndDeletedAtIsNull(request.username())
-                .orElseThrow(InvalidCredentialsException::new);
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_CREDENTIALS));
 
-        if (user.getStatus() != UserStatus.ACTIVE) throw new UserInactiveException();
+        if (user.getStatus() != UserStatus.ACTIVE) throw new BusinessException(ErrorCode.USER_INACTIVE);
 
         Long userId = user.getId();
         long ver = user.getTokenVersion();
@@ -85,7 +81,7 @@ public class AuthService {
 
         String tokenDevice = c.deviceId();
         if (tokenDevice == null || !tokenDevice.equals(request.deviceId())) {
-            throw new DeviceMismatchException(request.deviceId(),  tokenDevice);
+            throw new BusinessException(ErrorCode.DEVICE_MISMATCH);
         }
 
         if (refreshTokenService.isUsed(jti)) {
@@ -103,9 +99,9 @@ public class AuthService {
         }
 
         User user = userRepository.findById(userId)
-                .orElseThrow(UserNotFoundException::new);
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         if (user.getStatus() != UserStatus.ACTIVE) {
-            throw new UserInactiveException();
+            throw new BusinessException(ErrorCode.USER_INACTIVE);
         }
         if (user.getTokenVersion() != ver) {
             throw new BusinessException(ErrorCode.SESSION_INVALIDATED);
@@ -136,7 +132,7 @@ public class AuthService {
 
     private JwtTokenProvider.TokenClaims decodeRefreshOrThrow(String token) {
         if (token == null || token.isBlank()) {     // ★ 추가
-            throw new TokenMissingException();
+            throw new BusinessException(ErrorCode.TOKEN_MISSING);
         }
         try {
             var c = jwtTokenProvider.decode(token);
