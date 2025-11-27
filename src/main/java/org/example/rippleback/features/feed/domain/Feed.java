@@ -41,7 +41,7 @@ public class Feed {
     @Builder.Default
     private String[] tagsNorm = new String[0];
 
-    @ManyToMany(fetch = FetchType.LAZY, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "feed_tags",
             joinColumns = @JoinColumn(name = "feed_id"),
@@ -119,11 +119,6 @@ public class Feed {
         this.updatedAt = Instant.now();
     }
 
-    public void publish() {
-        this.status = FeedStatus.PUBLISHED;
-        touchUpdatedAt();
-    }
-
     public void softDelete() {
         this.status = FeedStatus.DELETED;
         this.deletedAt = Instant.now();
@@ -135,21 +130,11 @@ public class Feed {
         touchUpdatedAt();
     }
 
-    public void updateContent(String content) {
-        this.content = content;
-        touchUpdatedAt();
-    }
-
     public void updateTags(List<FeedTag> newTags) {
         this.tags = newTags != null ? newTags : new ArrayList<>();
         this.tagsNorm = newTags == null ? new String[0] : newTags.stream()
                 .map(FeedTag::getName)
                 .toArray(String[]::new);
-        touchUpdatedAt();
-    }
-
-    public void updateMediaKeys(List<String> mediaKeys) {
-        this.mediaKeys = mediaKeys;
         touchUpdatedAt();
     }
 }

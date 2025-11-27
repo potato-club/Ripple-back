@@ -5,7 +5,11 @@ import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.example.rippleback.core.error.BusinessException;
 import org.example.rippleback.core.error.ErrorCode;
+import org.example.rippleback.features.feed.app.FeedService;
+import org.example.rippleback.features.feed.domain.Feed;
 import org.example.rippleback.features.feed.domain.FeedStatus;
+import org.example.rippleback.features.feed.infra.FeedBookmarkRepository;
+import org.example.rippleback.features.feed.infra.FeedLikeRepository;
 import org.example.rippleback.features.feed.infra.FeedRepository;
 import org.example.rippleback.features.media.domain.Media;
 import org.example.rippleback.features.media.infra.MediaRepository;
@@ -42,6 +46,9 @@ public class UserService {
     private final RefreshTokenService refreshTokenService;
     private final UserMapper userMapper;
     private final Clock clock;
+    private final FeedService feedService;
+    private final FeedLikeRepository feedLikeRepository;
+    private final FeedBookmarkRepository feedBookmarkRepository;
 
     @PersistenceContext
     private EntityManager em;
@@ -163,6 +170,9 @@ public class UserService {
 
     @Transactional
     public void softDelete(Long meId) {
+        feedLikeRepository.deleteByUserId(meId);
+        feedBookmarkRepository.deleteByUserId(meId);
+        feedService.deleteAllByAuthorId(meId);
         User me = loadActiveForWrite(meId);
         me.softDelete(Instant.now(clock));
         me.bumpTokenVersion();

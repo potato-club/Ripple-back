@@ -23,18 +23,13 @@ public class FeedController {
     }
 
     @GetMapping("/{id}")
-    public FeedResponseDto getFeed(@PathVariable Long id) {
-        return  feedService.getFeed(id);
+    public FeedResponseDto getFeed(@PathVariable Long id, @AuthenticationPrincipal JwtPrincipal principal) {
+        return  feedService.getFeed(id, principal.userId());
     }
 
     @GetMapping
-    public List<FeedResponseDto> getAllFeeds() {
-        return feedService.getAllFeeds();
-    }
-
-    @PutMapping("/{feedId}")
-    public FeedResponseDto updateFeed(@AuthenticationPrincipal JwtPrincipal principal, @PathVariable Long feedId, @RequestBody FeedRequestDto request) {
-        return feedService.updateFeed(principal.userId(), feedId, request);
+    public List<FeedResponseDto> getAllFeeds(@AuthenticationPrincipal JwtPrincipal principal) {
+        return feedService.getAllFeeds(principal.userId());
     }
 
     @DeleteMapping("/{feedId}")

@@ -12,6 +12,8 @@ import org.example.rippleback.features.feed.infra.FeedLikeRepository;
 import org.example.rippleback.features.feed.infra.FeedRepository;
 import org.example.rippleback.features.feed.infra.FeedTagRepository;
 import org.example.rippleback.features.media.app.MediaUrlResolver;
+import org.example.rippleback.features.user.infra.UserBlockRepository;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,50 +30,49 @@ public class FeedService {
     private final FeedTagRepository tagRepository;
     private final FeedMapper feedMapper;
     private final MediaUrlResolver mediaUrlResolver;
+    private final UserBlockRepository userBlockRepository;
 
     public FeedResponseDto createFeed(Long userId, FeedRequestDto request) {
         Feed feed = feedMapper.toEntity(userId, request);
+
+        if (request.tags() != null) {
+            List<FeedTag> tags = request.tags().stream()
+                    .map(name -> tagRepository.findByName(name)
+                            .orElseGet(() -> tagRepository.save(
+                                    FeedTag.builder()
+                                            .name(name)
+                                            .build()
+                            )))
+                    .toList();
+
+            feed.updateTags(tags);
+        }
+
         feedRepository.save(feed);
 
         return feedMapper.toResponse(feed, mediaUrlResolver);
     }
 
-    public FeedResponseDto getFeed(Long feedId) {
+    public FeedResponseDto getFeed(Long feedId, Long viewerId) {
         Feed feed = feedRepository.findById(feedId)
                 .orElseThrow(() -> new IllegalArgumentException("피드를 찾지 못했습니다."));
+        Long authorId = feed.getAuthorId();
+
+        boolean blocked = userBlockRepository.existsByBlockerIdAndBlockedId(authorId, viewerId);
+        if (blocked) {
+            throw new AccessDeniedException("차단관계입니다.");
+        }
 
         return feedMapper.toResponse(feed, mediaUrlResolver);
     }
 
-    public List<FeedResponseDto> getAllFeeds() {
-        return feedRepository.findAll().stream()
+    public List<FeedResponseDto> getAllFeeds(Long viewerId) {
+        List<Feed> feeds = feedRepository.findAllPublished();
+
+        return feeds.stream()
+                .filter(feed -> !userBlockRepository.existsByBlockerIdAndBlockedId(feed.getAuthorId(), viewerId))
                 .map(feed -> feedMapper.toResponse(feed, mediaUrlResolver))
                 .toList();
-    }
-
-    public FeedResponseDto updateFeed(Long userId, Long feedId, FeedRequestDto request) {
-        Feed feed = feedRepository.findById(feedId)
-                .orElseThrow(() -> new IllegalArgumentException("피드를 찾지 못했습니다."));
-
-        if (!feed.getAuthorId().equals(userId))
-            throw new SecurityException("다른 사람의 피드를 변경할 수 없습니다.");
-
-        feed.updateContent(request.content());
-        feed.updateMediaKeys(request.mediaKeys());
-        if (request.tags() != null) {
-            List<FeedTag> tagEntities = request.tags()
-                    .stream()
-                    .map(name -> tagRepository.findByName(name)
-                            .orElseGet(() -> FeedTag.builder()
-                                    .name(name)
-                                    .build()))
-                    .toList();
-
-            feed.updateTags(tagEntities);
-        }
-        feed.updateVisibility(request.visibility() != null ? request.visibility() : feed.getVisibility());
-
-        return feedMapper.toResponse(feed, mediaUrlResolver);
     }
 
     public void deleteFeed(Long userId, Long feedId) {
@@ -82,6 +83,12 @@ public class FeedService {
             throw new SecurityException("다른 사람의 피드를 지울 수 없습니다.");
 
         feed.softDelete();
+    }
+
+    public void deleteAllByAuthorId(Long authorId) {
+        List<Feed> feeds = feedRepository.findByAuthorId(authorId);
+
+        feeds.forEach(Feed::softDelete);
     }
 
     public void likeFeed(Long userId, Long feedId) {
