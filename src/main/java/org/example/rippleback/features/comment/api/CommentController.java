@@ -10,8 +10,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
@@ -25,13 +23,12 @@ public class CommentController {
                                             @Validated @RequestBody CommentCreateRequestDto request,
                                             @AuthenticationPrincipal Long meId
     ) {
-        Comment comment = commentService.create(
+        return commentService.create(
                 meId,
                 feedId,
                 request.parentId(),
                 request.content()
         );
-        return CommentResponseDto.from(comment);
     }
 
     @DeleteMapping("/comments/{commentId}")

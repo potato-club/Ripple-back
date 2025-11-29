@@ -40,7 +40,7 @@ public class CommentService {
     private final UserMapper userMapper;
 
     @Transactional
-    public Comment create(Long authorId, Long feedId, Long parentId, String content) {
+    public CommentResponseDto  create(Long authorId, Long feedId, Long parentId, String content) {
         if (content == null || content.isBlank() || content.length() > 3000) {
             throw new BusinessException(ErrorCode.COMMENT_CONTENT_INVALID);
         }
@@ -51,7 +51,7 @@ public class CommentService {
 
         Long rootId = null;
         Long replyToUserId = null;
-
+        Long replyToCommentId = null;
 
         if (parentId != null) {
             Comment parent = commentRepo.findById(parentId)
@@ -70,6 +70,7 @@ public class CommentService {
                     : parent.getRootCommentId();
 
             replyToUserId = parent.getAuthorId();
+            replyToCommentId = parent.getId();
         }
 
         Comment saved = commentRepo.save(Comment.builder()
@@ -83,7 +84,12 @@ public class CommentService {
                 .build());
 
         feedRepo.incrementCommentCount(feedId);
-        return saved;
+
+        User author = userRepo.findById(authorId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        UserSummaryDto authorSummary = userMapper.toSummary(author);
+
+        return CommentResponseDto.from(saved, authorSummary);
     }
 
 
@@ -100,7 +106,9 @@ public class CommentService {
             throw new BusinessException(ErrorCode.COMMENT_DELETE_NOT_ALLOWED);
         }
 
+        boolean wasVisible = c.isVisible();
         boolean isRoot = c.isRoot();
+
         if (isRoot) {
             boolean hasVisibleChild =
                     commentRepo.existsByRootCommentIdAndVisibility(
@@ -118,7 +126,11 @@ public class CommentService {
         }
 
         commentLikeRepo.deleteAllByCommentId(commentId);
-        feedRepo.decrementCommentCount(c.getFeedId());
+
+        if (wasVisible && !c.isVisible()) {
+            feedRepo.decrementCommentCount(c.getFeedId());
+        }
+
         commentRepo.save(c);
     }
 
@@ -205,27 +217,42 @@ public class CommentService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.FEED_NOT_FOUND));
         assertFeedVisibleToMeOr404(feed, viewerId);
 
+        if (size <= 0) {
+            size = 10;
+        }
         Pageable pageable = PageRequest.of(0, size);
+
         List<Comment> comments = commentRepo.findRootComments(feedId, cursorId, pageable);
+
+        if (comments.isEmpty()) {
+            return new CommentPageResponseDto(List.of(), null, false);
+        }
 
         Set<Long> authorIds = comments.stream()
                 .map(Comment::getAuthorId)
                 .collect(Collectors.toSet());
 
-        List<User> users = userRepo.findByIdInAndDeletedAtIsNull(authorIds);
+        List<User> users = authorIds.isEmpty()
+                ? List.of()
+                : userRepo.findByIdInWithProfile(authorIds);
 
         Map<Long, UserSummaryDto> authorMap = users.stream()
                 .map(userMapper::toSummary)
                 .collect(Collectors.toMap(UserSummaryDto::id, it -> it));
 
         List<CommentResponseDto> dtos = comments.stream()
-                .map(c -> CommentResponseDto.from(c, authorMap.get(c.getAuthorId())))
+                .map(c -> {
+                    UserSummaryDto author = authorMap.get(c.getAuthorId());
+                    if (author == null) {
+                        author = new UserSummaryDto(c.getAuthorId(), "Ripple User", null);
+                    }
+                    return CommentResponseDto.from(c, author);
+                })
                 .toList();
-        Long nextCursor = comments.isEmpty()
-                ? null
-                : comments.getLast().getId();
 
-        boolean hasNext = comments.size() == size;
+        Comment last = comments.get(comments.size() - 1);
+        Long nextCursor = comments.size() == size ? last.getId() : null;
+        boolean hasNext = nextCursor != null;
 
         return new CommentPageResponseDto(dtos, nextCursor, hasNext);
     }
@@ -248,28 +275,42 @@ public class CommentService {
             throw new BusinessException(ErrorCode.INVALID_COMMENT_THREAD);
         }
 
+        if (size <= 0) {
+            size = 10;
+        }
         Pageable pageable = PageRequest.of(0, size);
-        List<Comment> replies =
-                commentRepo.findReplies(feedId, rootCommentId, cursorId, pageable);
+
+        List<Comment> replies = commentRepo.findReplies(feedId, rootCommentId, cursorId, pageable);
+
+        if (replies.isEmpty()) {
+            return new CommentPageResponseDto(List.of(), null, false);
+        }
 
         Set<Long> authorIds = replies.stream()
                 .map(Comment::getAuthorId)
                 .collect(Collectors.toSet());
 
-        List<User> users = userRepo.findByIdInAndDeletedAtIsNull(authorIds);
+        List<User> users = authorIds.isEmpty()
+                ? List.of()
+                : userRepo.findByIdInWithProfile(authorIds);
 
         Map<Long, UserSummaryDto> authorMap = users.stream()
                 .map(userMapper::toSummary)
                 .collect(Collectors.toMap(UserSummaryDto::id, it -> it));
 
         List<CommentResponseDto> dtos = replies.stream()
-                .map(c -> CommentResponseDto.from(c, authorMap.get(c.getAuthorId())))
+                .map(c -> {
+                    UserSummaryDto author = authorMap.get(c.getAuthorId());
+                    if (author == null) {
+                        author = new UserSummaryDto(c.getAuthorId(), "Ripple User", null);
+                    }
+                    return CommentResponseDto.from(c, author);
+                })
                 .toList();
-        Long nextCursor = replies.isEmpty()
-                ? null
-                : replies.getLast().getId();
 
-        boolean hasNext = replies.size() == size;
+        Comment last = replies.get(replies.size() - 1);
+        Long nextCursor = replies.size() == size ? last.getId() : null;
+        boolean hasNext = nextCursor != null;
 
         return new CommentPageResponseDto(dtos, nextCursor, hasNext);
     }

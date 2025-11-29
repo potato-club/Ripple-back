@@ -53,7 +53,7 @@ public class Comment {
     private CommentStatus status = CommentStatus.PUBLISHED;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "visiblity", length = 16, nullable = false)
+    @Column(name = "visibility", length = 16, nullable = false)
     @Builder.Default
     private CommentVisibility visibility = CommentVisibility.VISIBLE;
 

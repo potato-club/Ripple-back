@@ -7,6 +7,7 @@ import org.example.rippleback.features.user.api.dto.SignupResponseDto;
 import org.example.rippleback.features.user.api.dto.UserResponseDto;
 import org.example.rippleback.features.user.api.dto.UserSummaryDto;
 import org.example.rippleback.features.user.domain.User;
+import org.example.rippleback.features.user.domain.UserStatus;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -15,11 +16,20 @@ public class UserMapper {
 
     private final MediaUrlResolver url;
 
+    private static final String DELETED_USERNAME = "Ripple User";
+    private static final String DEFAULT_PROFILE_KEY = "images/default-profile.png";
+
     private String profileImageUrlOf(User u) {
+        if (u.getStatus() == UserStatus.DELETED) {
+            return url.toPublicUrl(DEFAULT_PROFILE_KEY);
+        }
+
         var m = u.getProfileMedia();
         if (m == null) return null;
         var key = m.getObjectKey();
-        return (key == null || key.isBlank()) ? null : url.toPublicUrl(key);
+        return (key == null || key.isBlank())
+                ? null
+                : url.toPublicUrl(key);
     }
 
     public MeResponseDto toMe(User u) {
@@ -43,9 +53,14 @@ public class UserMapper {
     }
 
     public UserSummaryDto toSummary(User u) {
+        String username = u.getUsername();
+        if (u.getStatus() == UserStatus.DELETED) {
+            username = DELETED_USERNAME;
+        }
+
         return new UserSummaryDto(
                 u.getId(),
-                u.getUsername(),
+                username,
                 profileImageUrlOf(u)
         );
     }
