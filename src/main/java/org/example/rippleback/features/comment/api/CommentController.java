@@ -3,7 +3,6 @@ package org.example.rippleback.features.comment.api;
 import lombok.RequiredArgsConstructor;
 import org.example.rippleback.features.comment.api.dto.*;
 import org.example.rippleback.features.comment.app.CommentService;
-import org.example.rippleback.features.comment.domain.Comment;
 import org.example.rippleback.features.comment.domain.CommentReport;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
