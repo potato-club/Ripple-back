@@ -2,6 +2,7 @@ package org.example.rippleback.features.feed.api;
 
 import lombok.RequiredArgsConstructor;
 import org.example.rippleback.core.security.jwt.JwtPrincipal;
+import org.example.rippleback.features.feed.api.dto.FeedPageDto;
 import org.example.rippleback.features.feed.api.dto.FeedRequestDto;
 import org.example.rippleback.features.feed.api.dto.FeedResponseDto;
 import org.example.rippleback.features.feed.app.FeedService;
@@ -23,18 +24,18 @@ public class FeedController {
     }
 
     @GetMapping("/{id}")
-    public FeedResponseDto getFeed(@PathVariable Long id) {
-        return  feedService.getFeed(id);
+    public FeedResponseDto getFeed(@PathVariable Long id, @AuthenticationPrincipal JwtPrincipal principal) {
+        return  feedService.getFeed(id, principal.userId());
     }
 
     @GetMapping
-    public List<FeedResponseDto> getAllFeeds() {
-        return feedService.getAllFeeds();
+    public List<FeedResponseDto> getUserAllFeeds(@AuthenticationPrincipal JwtPrincipal principal) {
+        return feedService.getUserAllFeeds(principal.userId());
     }
 
-    @PutMapping("/{feedId}")
-    public FeedResponseDto updateFeed(@AuthenticationPrincipal JwtPrincipal principal, @PathVariable Long feedId, @RequestBody FeedRequestDto request) {
-        return feedService.updateFeed(principal.userId(), feedId, request);
+    @GetMapping
+    public FeedPageDto getHomeFeeds(@RequestParam(required = false) Long cursor, @RequestParam(defaultValue = "10") int limit){
+        return feedService.getHomeFeeds(cursor, limit);
     }
 
     @DeleteMapping("/{feedId}")
