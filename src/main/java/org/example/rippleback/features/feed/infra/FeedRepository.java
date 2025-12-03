@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -32,4 +33,21 @@ AND (:cursor IS NULL OR feed.id < :cursor)
 ORDER BY feed.id DESC
 """)
     List<Feed> findFeedsForHome(@Param("cursor") Long cursor, Pageable pageable);
+
+    @Modifying(clearAutomatically = true)
+    @Query("""
+        update Feed f
+           set f.commentCount = f.commentCount + 1
+         where f.id = :feedId
+    """)
+    int incrementCommentCount(@Param("feedId") Long feedId);
+
+    @Modifying(clearAutomatically = true)
+    @Query("""
+                update Feed f
+                   set f.commentCount = f.commentCount - 1
+                 where f.id = :feedId
+                   and f.commentCount > 0
+            """)
+    int decrementCommentCount(@Param("feedId") Long feedId);
 }

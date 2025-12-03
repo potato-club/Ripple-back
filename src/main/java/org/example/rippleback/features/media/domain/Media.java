@@ -43,9 +43,12 @@ public class Media {
     private String mimeType;
 
     private Integer width;
+
     private Integer height;
+
     @Column(name = "duration_sec")
     private Short durationSec;
+
     @Column(name = "size_bytes")
     private Long sizeBytes;
 

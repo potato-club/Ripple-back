@@ -39,4 +39,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
     int incrementTokenVersion(@Param("userId") Long userId);
 
     List<User> findByIdInAndDeletedAtIsNull(Collection<Long> ids);
+
+    @Query("""
+        select u from User u
+        left join fetch u.profileMedia
+        where u.id in :ids
+        """)
+    List<User> findByIdInWithProfile(@Param("ids") Collection<Long> ids);
 }

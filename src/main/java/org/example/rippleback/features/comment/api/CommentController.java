@@ -3,14 +3,11 @@ package org.example.rippleback.features.comment.api;
 import lombok.RequiredArgsConstructor;
 import org.example.rippleback.features.comment.api.dto.*;
 import org.example.rippleback.features.comment.app.CommentService;
-import org.example.rippleback.features.comment.domain.Comment;
 import org.example.rippleback.features.comment.domain.CommentReport;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api")
@@ -25,13 +22,12 @@ public class CommentController {
                                             @Validated @RequestBody CommentCreateRequestDto request,
                                             @AuthenticationPrincipal Long meId
     ) {
-        Comment comment = commentService.create(
+        return commentService.create(
                 meId,
                 feedId,
                 request.parentId(),
                 request.content()
         );
-        return CommentResponseDto.from(comment);
     }
 
     @DeleteMapping("/comments/{commentId}")

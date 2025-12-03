@@ -42,7 +42,11 @@ public class SwaggerConfig {
     public GroupedOpenApi commentApi() {
         return GroupedOpenApi.builder()
                 .group("comments")
-                .pathsToMatch("/api/feeds/**/comments/**")
+                .pathsToMatch(
+                        "/api/feeds/*/comments",
+                        "/api/feeds/*/comments/**",
+                        "/api/comments/**"
+                )
                 .build();
     }
 }
