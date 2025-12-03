@@ -2,6 +2,7 @@ package org.example.rippleback.features.feed.api;
 
 import lombok.RequiredArgsConstructor;
 import org.example.rippleback.core.security.jwt.JwtPrincipal;
+import org.example.rippleback.features.feed.api.dto.FeedPageDto;
 import org.example.rippleback.features.feed.api.dto.FeedRequestDto;
 import org.example.rippleback.features.feed.api.dto.FeedResponseDto;
 import org.example.rippleback.features.feed.app.FeedService;
@@ -28,8 +29,13 @@ public class FeedController {
     }
 
     @GetMapping
-    public List<FeedResponseDto> getAllFeeds(@AuthenticationPrincipal JwtPrincipal principal) {
-        return feedService.getAllFeeds(principal.userId());
+    public List<FeedResponseDto> getUserAllFeeds(@AuthenticationPrincipal JwtPrincipal principal) {
+        return feedService.getUserAllFeeds(principal.userId());
+    }
+
+    @GetMapping
+    public FeedPageDto getHomeFeeds(@RequestParam(required = false) Long cursor, @RequestParam(defaultValue = "10") int limit){
+        return feedService.getHomeFeeds(cursor, limit);
     }
 
     @DeleteMapping("/{feedId}")

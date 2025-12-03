@@ -82,7 +82,8 @@ public class CommentService {
                 .createdAt(Instant.now())
                 .build());
 
-        feedRepo.incrementCommentCount(feedId);
+        Feed feed = feedRepo.findById(feedId).orElseThrow(() -> new BusinessException(ErrorCode.FEED_NOT_FOUND));
+        feed.increaseCommentCount();
         return saved;
     }
 
@@ -118,7 +119,8 @@ public class CommentService {
         }
 
         commentLikeRepo.deleteAllByCommentId(commentId);
-        feedRepo.decrementCommentCount(c.getFeedId());
+        Feed feed = feedRepo.findById(c.getFeedId()).orElseThrow(() -> new BusinessException(ErrorCode.FEED_NOT_FOUND));
+        feed.decreaseCommentCount();
         commentRepo.save(c);
     }
 

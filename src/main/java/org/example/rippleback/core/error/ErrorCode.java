@@ -46,6 +46,7 @@ public enum ErrorCode {
     ALREADY_LIKED_FEED(HttpStatus.CONFLICT, "1205", "이미 좋아요를 누른 상태입니다."),
     INSUFFICIENT_CREDITS(HttpStatus.BAD_REQUEST, "1206", "잔여 보기 크레딧이 부족합니다."),
     CREDIT_BALANCE_INCONSISTENT(HttpStatus.INTERNAL_SERVER_ERROR, "1207", "피드 크레딧 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."),
+    INVALID_DELETE_OTHER(HttpStatus.CONFLICT, "1208", "타인의 포스트를 삭제할 수 없습니다."),
 
     // COMMENT (1300–1399)
     COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "1300", "댓글을 찾을 수 없습니다."),
