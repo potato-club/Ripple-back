@@ -39,10 +39,10 @@ public class Comment {
     private Long rootCommentId;
 
     @Column(name = "to_user_id")
-    Long replyToUserId;
+    private Long replyToUserId;
 
     @Column(name = "to_comment_id")
-    Long replyToCommentId;
+    private Long replyToCommentId;
 
     @Column(name = "content", nullable = false, columnDefinition = "text")
     private String content;

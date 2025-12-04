@@ -74,7 +74,6 @@ public class Feed {
     @CollectionTable(name = "feed_media_keys", joinColumns = @JoinColumn(name = "feed_id"))
     @Column(name = "media_key")
     private List<String> mediaKeys;
-    // S3 object key 리스트 ; "videos/12345" or "images/abcde.jpg" 등
 
     @Enumerated(EnumType.STRING)
     @Column(length = 16, nullable = false)
