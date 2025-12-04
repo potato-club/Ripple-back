@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.rippleback.features.comment.api.dto.*;
 import org.example.rippleback.features.comment.app.CommentService;
 import org.example.rippleback.features.comment.domain.CommentReport;
+import org.example.rippleback.features.comment.domain.CommentSortType;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
@@ -75,11 +76,20 @@ public class CommentController {
             @Validated CommentPageRequestDto request,
             @AuthenticationPrincipal Long meId
     ) {
+        int size = (request.size() == null || request.size() <= 0)
+                ? 10
+                : request.size();
+
+        CommentSortType sort = request.sort() == null
+                ? CommentSortType.LATEST
+                : request.sort();
+
         return commentService.getRootComments(
                 meId,
                 feedId,
                 request.cursorId(),
-                request.size()
+                size,
+                sort
         );
     }
 
@@ -90,12 +100,18 @@ public class CommentController {
             @Validated CommentPageRequestDto request,
             @AuthenticationPrincipal Long meId
     ) {
+        int size = (request.size() == null || request.size() <= 0) ? 10 : request.size();
+        CommentSortType sort = request.sort() == null
+                ? CommentSortType.LATEST
+                : request.sort();
+
         return commentService.getReplies(
                 meId,
                 feedId,
                 commentId,
                 request.cursorId(),
-                request.size()
+                size,
+                sort
         );
     }
 }

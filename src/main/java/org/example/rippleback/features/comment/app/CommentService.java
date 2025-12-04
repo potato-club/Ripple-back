@@ -211,18 +211,26 @@ public class CommentService {
             Long viewerId,
             Long feedId,
             Long cursorId,
-            int size
+            int size,
+            CommentSortType sortType
     ) {
         Feed feed = feedRepo.findById(feedId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FEED_NOT_FOUND));
         assertFeedVisibleToMeOr404(feed, viewerId);
 
-        if (size <= 0) {
-            size = 10;
-        }
+        int pageSize = Math.max(1, size);
         Pageable pageable = PageRequest.of(0, size);
 
-        List<Comment> comments = commentRepo.findRootComments(feedId, cursorId, pageable);
+        List<Comment> comments;
+
+        if (sortType == CommentSortType.LATEST) {
+            comments = commentRepo.findRootComments(feedId, cursorId, pageable);
+        } else if (sortType == CommentSortType.MOST_LIKED) {
+            comments = commentRepo.findRootCommentsOrderByLikeCountDesc(feedId, pageable);
+            cursorId = null;
+        } else {
+            comments = commentRepo.findRootComments(feedId, cursorId, pageable);
+        }
 
         if (comments.isEmpty()) {
             return new CommentPageResponseDto(List.of(), null, false);
@@ -250,9 +258,17 @@ public class CommentService {
                 })
                 .toList();
 
-        Comment last = comments.get(comments.size() - 1);
-        Long nextCursor = comments.size() == size ? last.getId() : null;
-        boolean hasNext = nextCursor != null;
+        Long nextCursor;
+        boolean hasNext;
+
+        if (sortType == CommentSortType.LATEST) {
+            Comment last = comments.get(comments.size() - 1);
+            nextCursor = comments.size() == pageSize ? last.getId() : null;
+            hasNext = nextCursor != null;
+        } else {
+            nextCursor = null;
+            hasNext = false;
+        }
 
         return new CommentPageResponseDto(dtos, nextCursor, hasNext);
     }
@@ -263,7 +279,8 @@ public class CommentService {
             Long feedId,
             Long rootCommentId,
             Long cursorId,
-            int size
+            int size,
+            CommentSortType sortType
     ) {
         Feed feed = feedRepo.findById(feedId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FEED_NOT_FOUND));
@@ -275,12 +292,17 @@ public class CommentService {
             throw new BusinessException(ErrorCode.INVALID_COMMENT_THREAD);
         }
 
-        if (size <= 0) {
-            size = 10;
-        }
+        int pageSize = Math.max(1, size);
         Pageable pageable = PageRequest.of(0, size);
 
-        List<Comment> replies = commentRepo.findReplies(feedId, rootCommentId, cursorId, pageable);
+        List<Comment> replies;
+        if (sortType == CommentSortType.LATEST) {
+            replies = commentRepo.findReplies(feedId, rootCommentId, cursorId, pageable);
+        } else if (sortType == CommentSortType.MOST_LIKED) {
+            replies = commentRepo.findReplies(feedId, rootCommentId, cursorId, pageable);
+        } else {
+            replies = commentRepo.findReplies(feedId, rootCommentId, cursorId, pageable);
+        }
 
         if (replies.isEmpty()) {
             return new CommentPageResponseDto(List.of(), null, false);
@@ -308,9 +330,17 @@ public class CommentService {
                 })
                 .toList();
 
-        Comment last = replies.get(replies.size() - 1);
-        Long nextCursor = replies.size() == size ? last.getId() : null;
-        boolean hasNext = nextCursor != null;
+        Long nextCursor;
+        boolean hasNext;
+
+        if (sortType == CommentSortType.LATEST) {
+            Comment last = replies.get(replies.size() - 1);
+            nextCursor = replies.size() == pageSize ? last.getId() : null;
+            hasNext = nextCursor != null;
+        } else {
+            nextCursor = null;
+            hasNext = false;
+        }
 
         return new CommentPageResponseDto(dtos, nextCursor, hasNext);
     }

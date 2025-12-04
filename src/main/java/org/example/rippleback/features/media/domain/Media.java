@@ -30,15 +30,12 @@ public class Media {
     @Column(name = "media_type", length = 10, nullable = false)
     private MediaType mediaType;
 
-    /** 이미지 전용: object key (예: users/{id}/profile/{uuid}.jpg) */
     @Column(name = "object_key", length = 512)
     private String objectKey;
 
-    /** 동영상 전용: video prefix (예: posts/{postId}/videos/{mediaId}) */
     @Column(name = "video_prefix", length = 512)
     private String videoPrefix;
 
-    /** 메타(선택 저장) */
     @Column(name = "mime_type", length = 100)
     private String mimeType;
 

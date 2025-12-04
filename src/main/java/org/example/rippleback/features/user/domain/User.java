@@ -59,9 +59,6 @@ public class User {
     @Column(name = "token_version", nullable = false)
     private Long tokenVersion = 0L;
 
-    @Column(name = "deleted_at")
-    private Instant deletedAt;
-
     @Column(name = "last_login_at")
     private Instant lastLoginAt;
 
@@ -72,6 +69,9 @@ public class User {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private Instant updatedAt;
+
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
 
     public void verifyEmail() {
         this.emailVerified = true;
