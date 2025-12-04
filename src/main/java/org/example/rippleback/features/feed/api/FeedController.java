@@ -2,10 +2,12 @@ package org.example.rippleback.features.feed.api;
 
 import lombok.RequiredArgsConstructor;
 import org.example.rippleback.core.security.jwt.JwtPrincipal;
+import org.example.rippleback.features.feed.api.dto.FeedFullViewDto;
 import org.example.rippleback.features.feed.api.dto.FeedPageDto;
 import org.example.rippleback.features.feed.api.dto.FeedRequestDto;
 import org.example.rippleback.features.feed.api.dto.FeedResponseDto;
 import org.example.rippleback.features.feed.app.FeedService;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,6 +25,11 @@ public class FeedController {
         return feedService.createFeed(principal.userId(), request);
     }
 
+    @DeleteMapping("/{feedId}")
+    public void deleteFeed(@AuthenticationPrincipal JwtPrincipal principal, @PathVariable Long feedId) {
+        feedService.deleteFeed(principal.userId(), feedId);
+    }
+
     @GetMapping("/{id}")
     public FeedResponseDto getFeed(@PathVariable Long id, @AuthenticationPrincipal JwtPrincipal principal) {
         return  feedService.getFeed(id, principal.userId());
@@ -38,9 +45,10 @@ public class FeedController {
         return feedService.getHomeFeeds(cursor, limit);
     }
 
-    @DeleteMapping("/{feedId}")
-    public void deleteFeed(@AuthenticationPrincipal JwtPrincipal principal, @PathVariable Long feedId) {
-        feedService.deleteFeed(principal.userId(), feedId);
+    @GetMapping("/{feedId}")
+    public ResponseEntity<FeedFullViewDto> getFeedFullView(@PathVariable Long feedId, @AuthenticationPrincipal JwtPrincipal principal){
+        FeedFullViewDto response = feedService.getFeedFullView(feedId, principal.userId());
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/{feedId}/like")

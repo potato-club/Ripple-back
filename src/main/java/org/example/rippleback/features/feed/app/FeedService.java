@@ -3,26 +3,23 @@ package org.example.rippleback.features.feed.app;
 import lombok.RequiredArgsConstructor;
 import org.example.rippleback.core.error.BusinessException;
 import org.example.rippleback.core.error.ErrorCode;
+import org.example.rippleback.features.feed.api.dto.FeedFullViewDto;
 import org.example.rippleback.features.feed.api.dto.FeedPageDto;
 import org.example.rippleback.features.feed.api.dto.FeedRequestDto;
 import org.example.rippleback.features.feed.api.dto.FeedResponseDto;
-import org.example.rippleback.features.feed.domain.Feed;
-import org.example.rippleback.features.feed.domain.FeedBookmark;
-import org.example.rippleback.features.feed.domain.FeedLike;
-import org.example.rippleback.features.feed.domain.FeedTag;
-import org.example.rippleback.features.feed.infra.FeedBookmarkRepository;
-import org.example.rippleback.features.feed.infra.FeedLikeRepository;
-import org.example.rippleback.features.feed.infra.FeedRepository;
-import org.example.rippleback.features.feed.infra.FeedTagRepository;
+import org.example.rippleback.features.feed.domain.*;
+import org.example.rippleback.features.feed.infra.*;
 import org.example.rippleback.features.media.app.MediaUrlResolver;
+import org.example.rippleback.features.user.domain.User;
 import org.example.rippleback.features.user.infra.UserBlockRepository;
+import org.example.rippleback.features.user.infra.UserRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -38,6 +35,8 @@ public class FeedService {
     private final FeedMapper feedMapper;
     private final MediaUrlResolver mediaUrlResolver;
     private final UserBlockRepository userBlockRepository;
+    private final FeedViewHistoryRepository feedViewHistoryRepository;
+    private final UserRepository userRepository;
 
     public FeedResponseDto createFeed(Long userId, FeedRequestDto request) {
         Feed feed = feedMapper.toEntity(userId, request);
@@ -60,12 +59,29 @@ public class FeedService {
         return feedMapper.toResponse(feed, mediaUrlResolver);
     }
 
+    public void deleteFeed(Long userId, Long feedId) {
+        Feed feed = feedRepository.findById(feedId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.FEED_NOT_FOUND));
+
+        if (!feed.getAuthorId().equals(userId))
+            throw new BusinessException(ErrorCode.INVALID_DELETE_OTHER);
+
+        feed.softDelete();
+    }
+
+    public void deleteAllByAuthorId(Long authorId) {
+        List<Feed> feeds = feedRepository.findByAuthorId(authorId);
+
+        feeds.forEach(Feed::softDelete);
+    }
+
+
     public FeedResponseDto getFeed(Long feedId, Long viewerId) {
         Feed feed = feedRepository.findById(feedId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FEED_NOT_FOUND));
         Long authorId = feed.getAuthorId();
-
         boolean blocked = userBlockRepository.existsByBlockerIdAndBlockedId(authorId, viewerId);
+
         if (blocked) {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }
@@ -81,6 +97,7 @@ public class FeedService {
                 .map(feed -> feedMapper.toResponse(feed, mediaUrlResolver))
                 .toList();
     }
+
 
     public FeedPageDto getHomeFeeds(Long cursor, int limit) {
         Pageable pageable = PageRequest.of(0, limit);
@@ -99,20 +116,73 @@ public class FeedService {
 
     }
 
-    public void deleteFeed(Long userId, Long feedId) {
+    public FeedFullViewDto getFeedFullView(Long userId, Long feedId) {
         Feed feed = feedRepository.findById(feedId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FEED_NOT_FOUND));
 
-        if (!feed.getAuthorId().equals(userId))
-            throw new BusinessException(ErrorCode.INVALID_DELETE_OTHER);
+        boolean hasViewed = feedViewHistoryRepository.existsByUserIdAndFeedId(userId, feedId);
 
-        feed.softDelete();
-    }
+        if (!hasViewed) {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-    public void deleteAllByAuthorId(Long authorId) {
-        List<Feed> feeds = feedRepository.findByAuthorId(authorId);
+            if (user.getCredits() <= 0) {
+                throw new BusinessException(ErrorCode.NOT_ENOUGH_CREDITS);
+            }
 
-        feeds.forEach(Feed::softDelete);
+            user.decreaseCredits(1);
+
+            feedViewHistoryRepository.save(FeedViewHistory.builder()
+                    .userId(userId)
+                    .feedId(feedId)
+                    .viewedAt(Instant.now())
+                    .build()
+            );
+        }
+
+        boolean liked = feedLikeRepository.existsByFeedIdAndUserId(feedId, userId);
+        boolean bookmarked = feedBookmarkRepository.existsByFeedIdAndUserId(feedId, userId);
+
+        String videoHlsUrl = null;
+        String videoSourceUrl = null;
+        List<String> imageUrls = new ArrayList<>();
+
+        for (String key : feed.getMediaKeys()) {
+            boolean isVideo = !key.contains(".") && !key.endsWith("/");
+
+            if (isVideo) {
+                // 영상의 경우: key = "videos/abc123"
+                videoHlsUrl = mediaUrlResolver.hlsManifestUrl(key);
+                videoSourceUrl = mediaUrlResolver.videoSourceUrl(key, "mp4"); // 규칙에 따라 mp4 또는 다른 확장자
+            }
+
+            else {
+                // 이미지의 경우 바로 공개 URL
+                imageUrls.add(mediaUrlResolver.toPublicUrl(key));
+            }
+        }
+
+        List<String> tagNames = feed.getTags().stream()
+                .map(FeedTag::getName)
+                .toList();
+
+        return FeedFullViewDto.builder()
+                .id(feed.getId())
+                .authorId(feed.getAuthorId())
+                .authorName(feed.getAuthor().getUsername())
+                .content(feed.getContent())
+                .imageUrls(imageUrls)
+                .videoHlsUrl(videoHlsUrl)
+                .videoSourceUrl(videoSourceUrl)
+                .tags(tagNames)
+                .likeCount(feed.getLikeCount())
+                .bookmarkCount(feed.getBookmarkCount())
+                .viewCount(feed.getViewCount())
+                .liked(liked)
+                .bookmarked(bookmarked)
+                .createdAt(feed.getCreatedAt())
+                .build();
+
     }
 
     public void likeFeed(Long userId, Long feedId) {
@@ -141,7 +211,6 @@ public class FeedService {
     public void bookmarkFeed(Long userId, Long feedId) {
         Feed feed = feedRepository.findById(feedId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FEED_NOT_FOUND));
-
         Optional<FeedBookmark> on = feedBookmarkRepository.findByFeedIdAndUserId(feedId, userId);
 
         if (on.isPresent()) {
@@ -159,10 +228,5 @@ public class FeedService {
         feedBookmarkRepository.save(bookmark);
         feed.increaseBookmarkCount();
         feedRepository.save(feed);
-    }
-
-    public void commentFeed(Long userId, Long feedId) {
-        Feed feed = feedRepository.findById(feedId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.FEED_NOT_FOUND));
     }
 }

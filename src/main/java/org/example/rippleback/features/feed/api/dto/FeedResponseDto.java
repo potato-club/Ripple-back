@@ -10,6 +10,7 @@ public record FeedResponseDto(
         Long id,
         Long authorId,
         String content,
+        String thumbnail,
         List<String> mediaUrls,
         String[] tags,
         int likeCount,

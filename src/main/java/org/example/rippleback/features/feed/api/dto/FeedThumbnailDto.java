@@ -1,6 +1,6 @@
 package org.example.rippleback.features.feed.api.dto;
 
-public record ReelsThumbnailDto(
+public record FeedThumbnailDto(
         Long id,
         String thumbnailUrl,
         Long likeCount,

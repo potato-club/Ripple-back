@@ -24,6 +24,8 @@ public enum ErrorCode {
     CANNOT_FOLLOW_SELF(HttpStatus.BAD_REQUEST, "1009", "자기 자신을 팔로우할 수 없습니다."),
     CANNOT_BLOCK_SELF(HttpStatus.BAD_REQUEST, "1010", "자기 자신을 차단할 수 없습니다."),
     FOLLOW_NOT_ALLOWED_YOU_BLOCKED_TARGET(HttpStatus.FORBIDDEN, "1011", "차단한 사용자는 팔로우할 수 없습니다."),
+    NOT_ENOUGH_CREDITS(HttpStatus.CONFLICT, "1012", "영상을 보기 위한 크레딧이 부족합니다."),
+    FULL_CREDITS(HttpStatus.CONFLICT, "1012", "크레딧의 갯수가 최대치입니다."),
 
     // AUTH (1100–1199)
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "1100", "이메일 또는 비밀번호가 올바르지 않습니다."),
