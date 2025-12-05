@@ -16,6 +16,8 @@ import java.util.List;
 public interface FeedRepository extends JpaRepository<Feed, Long> {
     long countByAuthorIdAndStatus(Long id, FeedStatus feedStatus);
 
+    List<Feed> findByAuthorId(Long authorId);
+
     @Query("""
 SELECT feed FROM Feed feed
 WHERE feed.status = 'PUBLISHED'
@@ -23,7 +25,13 @@ ORDER BY feed.id DESC
 """)
     List<Feed> findAllPublished();
 
-    List<Feed> findByAuthorId(Long authorId);
+    @Query("""
+SELECT feed FROM Feed feed
+WHERE feed.status = 'PUBLISHED'
+AND (:ids IS NULL OR feed.id IN :ids)
+ORDER BY feed.id DESC
+""")
+    List<Feed> findByIdIn(@Param("ids") List<Long> ids);
 
     @Query("""
 SELECT feed FROM Feed feed
@@ -32,22 +40,22 @@ AND feed.authorId NOT IN :blockedIds
 AND (:cursor IS NULL OR feed.id < :cursor)
 ORDER BY feed.id DESC
 """)
-    List<Feed> findFeedsForHome(@Param("cursor") Long cursor, Pageable pageable);
+    List<Feed> findFeedsForHome(@Param("cursor") Long cursor, @Param("blockedIds") List<Long> blockedIds, Pageable pageable);
 
     @Modifying(clearAutomatically = true)
     @Query("""
-        update Feed f
-           set f.commentCount = f.commentCount + 1
-         where f.id = :feedId
-    """)
+update Feed f
+set f.commentCount = f.commentCount + 1
+where f.id = :feedId
+""")
     int incrementCommentCount(@Param("feedId") Long feedId);
 
     @Modifying(clearAutomatically = true)
     @Query("""
-                update Feed f
-                   set f.commentCount = f.commentCount - 1
-                 where f.id = :feedId
-                   and f.commentCount > 0
-            """)
+update Feed f
+set f.commentCount = f.commentCount - 1
+where f.id = :feedId
+and f.commentCount > 0
+""")
     int decrementCommentCount(@Param("feedId") Long feedId);
 }

@@ -49,6 +49,7 @@ public enum ErrorCode {
     INSUFFICIENT_CREDITS(HttpStatus.BAD_REQUEST, "1206", "잔여 보기 크레딧이 부족합니다."),
     CREDIT_BALANCE_INCONSISTENT(HttpStatus.INTERNAL_SERVER_ERROR, "1207", "피드 크레딧 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."),
     INVALID_DELETE_OTHER(HttpStatus.CONFLICT, "1208", "타인의 포스트를 삭제할 수 없습니다."),
+    TAG_NOT_FOUND(HttpStatus.NOT_FOUND, "1209", "태그를 찾을 수 없습니다."),
 
     // COMMENT (1300–1399)
     COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "1300", "댓글을 찾을 수 없습니다."),
@@ -62,6 +63,10 @@ public enum ErrorCode {
     // NOTIFICATION (1400–1499)
     NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "1400", "알림을 찾을 수 없습니다."),
     DUPLICATE_NOTIFICATION(HttpStatus.CONFLICT, "1401", "중복된 알림입니다."),
+
+    // MESSAGE (1500-1599)
+    NOT_FOUND_CONVERSATION(HttpStatus.NOT_FOUND, "1500", "대화방을 찾을 수 없습니다."),
+    NOT_CONTAIN_CONVERSATION(HttpStatus.CONFLICT, "1501", "대화 참여자가 아닙니다."),
 
     // MEDIA (1600–1699)
     INVALID_MEDIA_TYPE(HttpStatus.BAD_REQUEST, "1600", "허용되지 않은 미디어 형식입니다."),

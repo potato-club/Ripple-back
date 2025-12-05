@@ -2,7 +2,6 @@ package org.example.rippleback.features.feed.domain;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.example.rippleback.features.media.domain.MediaType;
 import org.example.rippleback.features.user.domain.User;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -20,7 +19,7 @@ import java.util.List;
         indexes = {
                 @Index(name = "ix_feeds_author", columnList = "author_id, id DESC"),
                 @Index(name = "ix_feeds_status", columnList = "status, id DESC")
-})
+        })
 public class Feed {
 
     @Id
@@ -38,18 +37,9 @@ public class Feed {
     private String content;
 
     @JdbcTypeCode(SqlTypes.ARRAY)
-    @Column(name = "tags_norm", columnDefinition ="text[]", nullable = false)
+    @Column(name = "tags_norm", columnDefinition = "text[]", nullable = false)
     @Builder.Default
     private String[] tagsNorm = new String[0];
-
-    @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-            name = "feed_tags",
-            joinColumns = @JoinColumn(name = "feed_id"),
-            inverseJoinColumns = @JoinColumn(name = "tag_id")
-    )
-    @Builder.Default
-    private List<FeedTag> tags = new ArrayList<>();
 
     @Column(name = "created_at", columnDefinition = "TIMESTAMPZ", nullable = false)
     @Builder.Default
@@ -68,9 +58,13 @@ public class Feed {
     @Column(name = "bookmark_count", nullable = false)
     private int bookmarkCount = 0;
 
+    @Column(name = "comment_count", nullable = false)
+    private int commentCount = 0;
+
     @Column(name = "view_count", nullable = false)
     private int viewCount = 0;
 
+    @Column(name = "feed_thumbnail")
     private String thumbnail;
 
     @ElementCollection(fetch = FetchType.LAZY)
@@ -133,11 +127,8 @@ public class Feed {
         touchUpdatedAt();
     }
 
-    public void updateTags(List<FeedTag> newTags) {
-        this.tags = newTags != null ? newTags : new ArrayList<>();
-        this.tagsNorm = newTags == null ? new String[0] : newTags.stream()
-                .map(FeedTag::getName)
-                .toArray(String[]::new);
-        touchUpdatedAt();
+    public void updateTagsNorm(List<String> tags) {
+        this.tagsNorm = tags.toArray(String[]::new);
     }
+
 }

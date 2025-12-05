@@ -37,24 +37,42 @@ public class FeedService {
     private final UserBlockRepository userBlockRepository;
     private final FeedViewHistoryRepository feedViewHistoryRepository;
     private final UserRepository userRepository;
+    private final FeedTagRelationRepository feedTagRelationRepository;
+
 
     public FeedResponseDto createFeed(Long userId, FeedRequestDto request) {
         Feed feed = feedMapper.toEntity(userId, request);
 
-        if (request.tags() != null) {
-            List<FeedTag> tags = request.tags().stream()
-                    .map(name -> tagRepository.findByName(name)
-                            .orElseGet(() -> tagRepository.save(
-                                    FeedTag.builder()
-                                            .name(name)
-                                            .build()
-                            )))
-                    .toList();
-
-            feed.updateTags(tags);
-        }
-
         feedRepository.save(feed);
+
+        if (request.tags() != null) {
+            List<String> norm = new ArrayList<>();
+
+            for (String name : request.tags()) {
+                // 1. 태그 정규화
+                String tagName = name.toLowerCase().trim();
+                norm.add(tagName);
+
+                // 2. 태그 엔티티 조회 or 생성
+                FeedTag tag = tagRepository.findByName(tagName)
+                        .orElseGet(() -> tagRepository.save(
+                                FeedTag.builder()
+                                        .name(tagName)
+                                        .build()
+                        ));
+
+                // 3. 테이블 저장
+                feedTagRelationRepository.save(
+                        FeedTagRelation.builder()
+                                .feedId(feed.getId())
+                                .tagId(tag.getId())
+                                .build()
+                );
+
+                // 4. Feed 도메인 메서드로 tagsNorm 설정
+                feed.updateTagsNorm(norm);
+            }
+        }
 
         return feedMapper.toResponse(feed, mediaUrlResolver);
     }
@@ -98,13 +116,11 @@ public class FeedService {
                 .toList();
     }
 
-
-    public FeedPageDto getHomeFeeds(Long cursor, int limit) {
+    public FeedPageDto getHomeFeeds(Long cursor, int limit, List<Long> blockedIds) {
         Pageable pageable = PageRequest.of(0, limit);
-        List<Feed> feeds = feedRepository.findFeedsForHome(cursor, pageable);
-        Long nextCursor = feeds.isEmpty()
-                ? null
-                : feeds.getLast().getId();
+        List<Long> safeBlockedIds = (blockedIds == null || blockedIds.isEmpty()) ? null : blockedIds;
+        List<Feed> feeds = feedRepository.findFeedsForHome(cursor, safeBlockedIds, pageable);
+        Long nextCursor = feeds.isEmpty() ? null : feeds.getLast().getId();
 
         return new FeedPageDto(
                 feeds.stream()
@@ -162,7 +178,9 @@ public class FeedService {
             }
         }
 
-        List<String> tagNames = feed.getTags().stream()
+        List<String> tagNames = feedTagRelationRepository.findByFeedId(feedId)
+                .stream()
+                .map(rel -> tagRepository.findById(rel.getTagId()).orElseThrow())
                 .map(FeedTag::getName)
                 .toList();
 
@@ -229,4 +247,24 @@ public class FeedService {
         feed.increaseBookmarkCount();
         feedRepository.save(feed);
     }
+
+    public List<String> searchTags(String keyword) {
+        return tagRepository.searchByKeyword(keyword.toLowerCase().trim())
+                .stream()
+                .map(FeedTag::getName)
+                .toList();
+    }
+
+    public List<FeedResponseDto> getFeedsByTag(String tagName) {
+        FeedTag tag = tagRepository.findByName(tagName.toLowerCase().trim())
+                .orElseThrow(() -> new BusinessException(ErrorCode.TAG_NOT_FOUND));
+
+        List<Long> feedIds = feedTagRelationRepository.findFeedIdsByTagId(tag.getId());
+        List<Feed> feeds = feedRepository.findByIdIn(feedIds);
+
+        return feeds.stream()
+                .map(feed -> feedMapper.toResponse(feed, mediaUrlResolver))
+                .toList();
+    }
+
 }
