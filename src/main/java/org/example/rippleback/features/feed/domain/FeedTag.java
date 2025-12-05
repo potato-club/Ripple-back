@@ -23,8 +23,4 @@ public class FeedTag {
 
     @Column(nullable = false, unique = true)
     private String name;
-
-    @ManyToMany(mappedBy = "tags")
-    @Builder.Default
-    private List<Feed> feeds = new ArrayList<>();
 }

@@ -7,6 +7,7 @@ import java.util.List;
 
 public record FeedRequestDto(
         String content,
+        String thumbnail,
         List<String> mediaKeys,
         List<String> tags,
         FeedVisibility visibility

@@ -19,6 +19,7 @@ public class FeedMapper {
         return Feed.builder()
                 .authorId(userId)
                 .content(request.content())
+                .thumbnail(request.thumbnail())
                 .mediaKeys(request.mediaKeys())
                 .visibility(request.visibility() == null ? FeedVisibility.PUBLIC : request.visibility())
                 .status(FeedStatus.PUBLISHED)
@@ -37,6 +38,7 @@ public class FeedMapper {
                 feed.getId(),
                 feed.getAuthorId(),
                 feed.getContent(),
+                feed.getThumbnail(),
                 urls,
                 feed.getTagsNorm(),
                 feed.getLikeCount(),

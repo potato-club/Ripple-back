@@ -30,11 +30,20 @@ public class Message {
     @Column(nullable = false)
     private String content;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private MessageType messageType;
+
     @Column(nullable = false)
     private LocalDateTime sentAt;
+
+    @Column(nullable = false)
+    private boolean deleted;
+
 
     @PrePersist
     public void prePersist(){
         this.sentAt = LocalDateTime.now();
+        this.deleted = false;
     }
 }
