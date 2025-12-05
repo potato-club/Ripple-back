@@ -22,15 +22,22 @@ import org.example.rippleback.features.user.infra.UserBlockRepository;
 import org.example.rippleback.features.user.infra.UserFollowRepository;
 import org.example.rippleback.features.user.infra.UserRepository;
 import org.example.rippleback.infra.redis.RefreshTokenService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -49,6 +56,11 @@ public class UserService {
     private final FeedService feedService;
     private final FeedLikeRepository feedLikeRepository;
     private final FeedBookmarkRepository feedBookmarkRepository;
+    private final S3Presigner s3Presigner;
+
+    @Value("${media.bucket}")
+    private String mediaBucket;
+    private static final long MAX_PROFILE_IMAGE_BYTES = 5 * 1024 * 1024L;
 
     @PersistenceContext
     private EntityManager em;
@@ -121,6 +133,30 @@ public class UserService {
         return new PageCursorResponse<>(items, next, hasNext);
     }
 
+    @Transactional(readOnly = true)
+    public ProfileImagePresignResponseDto prepareProfileImageUpload(Long meId, ProfileImagePresignRequestDto req) {
+        User me = loadActiveForWrite(meId);
+
+        if (req.sizeBytes() != null && req.sizeBytes() > MAX_PROFILE_IMAGE_BYTES) {
+            throw new BusinessException(ErrorCode.MEDIA_SIZE_EXCEEDED);
+        }
+
+        String ext = mapImageExtFromMime(req.mimeType());
+        if (ext == null) {
+            throw new BusinessException(ErrorCode.INVALID_MEDIA_TYPE);
+        }
+
+        String objectKey = buildProfileImageKey(me.getId(), ext);
+
+        String uploadUrl = createPresignedPutUrl(objectKey, req.mimeType(), req.sizeBytes());
+
+        return new ProfileImagePresignResponseDto(
+                uploadUrl,
+                objectKey,
+                MAX_PROFILE_IMAGE_BYTES
+        );
+    }
+
     @Transactional
     public UserResponseDto updateProfile(Long meId, UpdateProfileRequestDto req) {
         User me = loadActiveForWrite(meId);
@@ -129,7 +165,7 @@ public class UserService {
             String nu = req.username().strip();
             if (!nu.equalsIgnoreCase(me.getUsername())) {
                 if (userRepository.existsByUsernameIgnoreCaseAndDeletedAtIsNull(nu)) {
-                    throw new IllegalArgumentException("duplicate username"); // TODO 교체
+                    throw new BusinessException(ErrorCode.DUPLICATE_USERNAME);
                 }
                 me.changeUsername(nu);
             }
@@ -141,23 +177,42 @@ public class UserService {
                 : img.action();
 
         switch (action) {
-            case SET -> {
-                Long mediaId = img.mediaId();
-                if (mediaId == null) throw new IllegalArgumentException("mediaId required");
-                Media m = mediaRepo.findById(mediaId)
-                        .orElseThrow(() -> new IllegalArgumentException("media not found"));
-
-                me.updateProfileImage(m.getId());
+            case KEEP -> {
             }
-            case CLEAR -> me.clearProfileImage();
-            case KEEP -> { /* no-op */ }
+            case CLEAR -> {
+                me.clearProfileImage();
+            }
+            case SET -> {
+                if (img.objectKey() == null || img.objectKey().isBlank()) {
+                    throw new BusinessException(ErrorCode.INVALID_OBJECT_KEY);
+                }
+
+                String expectedPrefix = "users/" + meId + "/";
+                if (!img.objectKey().startsWith(expectedPrefix)) {
+                    throw new BusinessException(ErrorCode.INVALID_OBJECT_KEY);
+                }
+
+                Media media = Media.newProfileImage(
+                        me.getId(),
+                        img.objectKey(),
+                        img.mimeType(),
+                        img.width(),
+                        img.height(),
+                        img.sizeBytes()
+                );
+                mediaRepo.save(media);
+
+                me.updateProfileImage(media.getId());
+            }
         }
+
         long posts = feedRepo.countByAuthorIdAndStatus(meId, FeedStatus.PUBLISHED);
         long followers = userFollowRepo.countByFollowingId(meId);
         long followings = userFollowRepo.countByFollowerId(meId);
 
         return userMapper.toProfile(me, posts, followers, followings);
     }
+
 
     @Transactional
     public void changePassword(Long meId, String current, String newPw) {
@@ -286,5 +341,39 @@ public class UserService {
     }
 
     public record AvailabilityResponse(Boolean usernameAvailable, Boolean emailAvailable) {
+    }
+
+    private String mapImageExtFromMime(String mime) {
+        if (mime == null) return null;
+        return switch (mime.toLowerCase(Locale.ROOT)) {
+            case "image/jpeg", "image/jpg" -> "jpg";
+            case "image/png" -> "png";
+            case "image/webp" -> "webp";
+            case "image/avif" -> "avif";
+            default -> null;
+        };
+    }
+
+    private String buildProfileImageKey(Long userId, String ext) {
+        long now = Instant.now(clock).toEpochMilli();
+        String uuid = UUID.randomUUID().toString().replace("-", "");
+        return "users/%d/profile/%d_%s.%s".formatted(userId, now, uuid, ext);
+    }
+
+    private String createPresignedPutUrl(String objectKey, String mimeType, Long sizeBytes) {
+        PutObjectRequest.Builder putReq = PutObjectRequest.builder()
+                .bucket(mediaBucket)
+                .key(objectKey)
+                .contentType(mimeType);
+
+        PutObjectRequest por = putReq.build();
+
+        PutObjectPresignRequest presign = PutObjectPresignRequest.builder()
+                .putObjectRequest(por)
+                .signatureDuration(Duration.ofMinutes(10))
+                .build();
+
+        PresignedPutObjectRequest presigned = s3Presigner.presignPutObject(presign);
+        return presigned.url().toString();
     }
 }

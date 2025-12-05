@@ -87,6 +87,12 @@ app:
 cdn:
   base-url: ${CDN_BASE_URL}
 
+media:
+  bucket: ripple-uploads-hansei-gyu
+
+aws:
+  region: ap-northeast-2
+
 auth:
   cookie:
     name: __Secure-RT

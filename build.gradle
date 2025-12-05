@@ -40,8 +40,8 @@ dependencies {
 
     // JWT
     implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
-    runtimeOnly  'io.jsonwebtoken:jjwt-impl:0.11.5'
-    runtimeOnly  'io.jsonwebtoken:jjwt-jackson:0.11.5'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
 
     // Lombok & @ConfigurationProperties 메타데이터
     compileOnly 'org.projectlombok:lombok'
@@ -57,6 +57,13 @@ dependencies {
     // Mail
     implementation 'org.springframework.boot:spring-boot-starter-mail'
 
+    // AWS SDK v2 - S3 + Presigner
+    implementation platform('software.amazon.awssdk:bom:2.25.66')
+    implementation 'software.amazon.awssdk:s3'
+    implementation 'software.amazon.awssdk:s3-transfer-manager'
+    implementation 'software.amazon.awssdk:sts'
+    implementation 'software.amazon.awssdk:s3-presigner'
+
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
@@ -65,7 +72,6 @@ dependencies {
     testImplementation 'org.testcontainers:junit-jupiter:1.20.1'
     testImplementation 'org.testcontainers:postgresql:1.20.1'
     testImplementation 'com.redis:testcontainers-redis:2.2.4'
-
 }
 
 tasks.named('test') {
