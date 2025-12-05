@@ -91,6 +91,21 @@ public class UserController {
         return ResponseEntity.ok(userService.search(query, cursor, size));
     }
 
+    @Operation(summary = "프로필 이미지 업로드용 presign 발급", description = "AccessToken 필요")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "presigned URL 발급 성공"),
+            @ApiResponse(responseCode = "400", description = "지원하지 않는 mimeType/최대 용량 초과 등")
+    })
+    @PostMapping("/me/profile-image/presign")
+    public ResponseEntity<ProfileImagePresignResponseDto> presignProfileImage(
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal p,
+            @Valid @RequestBody ProfileImagePresignRequestDto req
+    ) {
+        var res = userService.prepareProfileImageUpload(p.userId(), req);
+        return ResponseEntity.ok(res);
+    }
+
+
     @Operation(summary = "프로필 수정", description = "AccessToken 필요")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "프로필 수정 성공"),

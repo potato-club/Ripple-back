@@ -64,6 +64,7 @@ public enum ErrorCode {
     // MEDIA (1600–1699)
     INVALID_MEDIA_TYPE(HttpStatus.BAD_REQUEST, "1600", "허용되지 않은 미디어 형식입니다."),
     INVALID_OBJECT_KEY(HttpStatus.BAD_REQUEST, "1601", "유효하지 않은 object key입니다."),
+    MEDIA_SIZE_EXCEEDED(HttpStatus.BAD_REQUEST, "1602", "허용된 용량을 초과한 미디어입니다."),
 
     // INFRA (2000–2099)
     DB_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "2000", "데이터베이스 오류가 발생했습니다."),
