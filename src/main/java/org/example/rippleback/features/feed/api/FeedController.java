@@ -28,12 +28,12 @@ public class FeedController {
         return  feedService.getFeed(id, principal.userId());
     }
 
-    @GetMapping
+    @GetMapping("/me")
     public List<FeedResponseDto> getUserAllFeeds(@AuthenticationPrincipal JwtPrincipal principal) {
         return feedService.getUserAllFeeds(principal.userId());
     }
 
-    @GetMapping
+    @GetMapping("/home")
     public FeedPageDto getHomeFeeds(@RequestParam(required = false) Long cursor, @RequestParam(defaultValue = "10") int limit){
         return feedService.getHomeFeeds(cursor, limit);
     }
