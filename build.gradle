@@ -62,7 +62,6 @@ dependencies {
     implementation 'software.amazon.awssdk:s3'
     implementation 'software.amazon.awssdk:s3-transfer-manager'
     implementation 'software.amazon.awssdk:sts'
-    implementation 'software.amazon.awssdk:s3-presigner'
 
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
