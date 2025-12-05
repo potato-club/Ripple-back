@@ -50,24 +50,27 @@ public class Feed {
     @Builder.Default
     private List<FeedTag> tags = new ArrayList<>();
 
-    @Column(name = "created_at", columnDefinition = "TIMESTAMPZ", nullable = false)
+    @Column(name = "created_at", columnDefinition = "TIMESTAMPTZ", nullable = false)
     @Builder.Default
     private Instant createdAt = Instant.now();
 
-    @Column(name = "updated_at", columnDefinition = "TIMESTAMPZ", nullable = false)
+    @Column(name = "updated_at", columnDefinition = "TIMESTAMPTZ", nullable = false)
     @Builder.Default
     private Instant updatedAt = Instant.now();
 
-    @Column(name = "deleted_at", columnDefinition = "TIMESTAMPZ")
+    @Column(name = "deleted_at", columnDefinition = "TIMESTAMPTZ")
     private Instant deletedAt;
 
     @Column(name = "like_count", nullable = false)
+    @Builder.Default
     private int likeCount = 0;
 
     @Column(name = "bookmark_count", nullable = false)
+    @Builder.Default
     private int bookmarkCount = 0;
 
     @Column(name = "comment_count", nullable = false)
+    @Builder.Default
     private int commentCount = 0;
 
     @ElementCollection(fetch = FetchType.LAZY)
