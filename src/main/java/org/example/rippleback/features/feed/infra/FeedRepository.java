@@ -2,7 +2,6 @@ package org.example.rippleback.features.feed.infra;
 
 import org.example.rippleback.features.feed.domain.Feed;
 import org.example.rippleback.features.feed.domain.FeedStatus;
-import org.example.rippleback.features.feed.domain.FeedVisibility;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -36,11 +35,44 @@ ORDER BY feed.id DESC
     @Query("""
 SELECT feed FROM Feed feed
 WHERE feed.status = 'PUBLISHED'
-AND feed.authorId NOT IN :blockedIds
 AND (:cursor IS NULL OR feed.id < :cursor)
 ORDER BY feed.id DESC
 """)
-    List<Feed> findFeedsForHome(@Param("cursor") Long cursor, @Param("blockedIds") List<Long> blockedIds, Pageable pageable);
+    List<Feed> findFeedsForHome(@Param("cursor") Long cursor, Pageable pageable);
+
+    @Modifying
+    @Query("""
+update Feed f
+set f.likeCount = f.likeCount + 1
+where f.id = :feedId
+""")
+    void incrementLikeCount(@Param("feedId") Long feedId);
+
+    @Modifying
+    @Query("""
+update Feed f
+set f.likeCount = f.likeCount - 1
+where f.id = :feedId
+and f.likeCount > 0
+""")
+    int decrementLikeCount(@Param("feedId") Long feedId);
+
+    @Modifying
+    @Query("""
+update Feed f
+set f.bookmarkCount = f.bookmarkCount + 1
+where f.id = :feedId
+""")
+    void incrementBookmarkCount(@Param("feedId") Long feedId);
+
+    @Modifying
+    @Query("""
+update Feed f
+set f.bookmarkCount = f.bookmarkCount - 1
+where f.id = :feedId
+and f.bookmarkCount > 0
+""")
+    int decrementBookmarkCount(@Param("feedId") Long feedId);
 
     @Modifying(clearAutomatically = true)
     @Query("""

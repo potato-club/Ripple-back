@@ -1,12 +1,16 @@
 package org.example.rippleback.features.feed.app;
 
 import lombok.RequiredArgsConstructor;
+import org.example.rippleback.features.feed.api.dto.FeedFullViewDto;
 import org.example.rippleback.features.feed.api.dto.FeedRequestDto;
 import org.example.rippleback.features.feed.api.dto.FeedResponseDto;
 import org.example.rippleback.features.feed.domain.Feed;
 import org.example.rippleback.features.feed.domain.FeedStatus;
 import org.example.rippleback.features.feed.domain.FeedVisibility;
 import org.example.rippleback.features.media.app.MediaUrlResolver;
+import org.example.rippleback.features.user.api.dto.UserSummaryDto;
+import org.example.rippleback.features.user.app.UserMapper;
+import org.example.rippleback.features.user.domain.User;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -14,6 +18,8 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class FeedMapper {
+
+    private final UserMapper userMapper;
 
     public Feed toEntity(Long userId, FeedRequestDto request) {
         return Feed.builder()
@@ -36,15 +42,17 @@ public class FeedMapper {
 
         return new FeedResponseDto(
                 feed.getId(),
-                feed.getAuthorId(),
+                userMapper.toSummary(feed.getAuthor()),
                 feed.getContent(),
-                feed.getThumbnail(),
-                urls,
                 feed.getTagsNorm(),
                 feed.getLikeCount(),
                 feed.getBookmarkCount(),
-                feed.getVisibility(),
+                feed.getBookmarkCount(),
+                feed.getBookmarkCount(),
+                feed.getThumbnail(),
+                urls,
                 feed.getStatus(),
+                feed.getVisibility(),
                 feed.getCreatedAt(),
                 feed.getUpdatedAt()
                 );

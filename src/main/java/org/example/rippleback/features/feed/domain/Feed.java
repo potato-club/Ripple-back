@@ -82,23 +82,6 @@ public class Feed {
     @Builder.Default
     private FeedStatus status = FeedStatus.PUBLISHED;
 
-
-    public void increaseLikeCount() {
-        likeCount++;
-    }
-
-    public void decreaseLikeCount() {
-        likeCount = Math.max(0, likeCount - 1);
-    }
-
-    public void increaseBookmarkCount() {
-        bookmarkCount++;
-    }
-
-    public void decreaseBookmarkCount() {
-        bookmarkCount = Math.max(0, bookmarkCount - 1);
-    }
-
     @PrePersist
     public void onCreate() {
         if (this.createdAt == null) {

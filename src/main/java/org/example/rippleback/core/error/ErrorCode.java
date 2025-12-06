@@ -50,6 +50,8 @@ public enum ErrorCode {
     CREDIT_BALANCE_INCONSISTENT(HttpStatus.INTERNAL_SERVER_ERROR, "1207", "피드 크레딧 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."),
     INVALID_DELETE_OTHER(HttpStatus.CONFLICT, "1208", "타인의 포스트를 삭제할 수 없습니다."),
     TAG_NOT_FOUND(HttpStatus.NOT_FOUND, "1209", "태그를 찾을 수 없습니다."),
+    INVALID_BOOKMARK_STATE(HttpStatus.BAD_REQUEST, "1210", "잘못된 북마크 형식입니다."),
+    INVALID_LIKE_STATE(HttpStatus.BAD_REQUEST, "1211", "잘못된 좋아요 형식입니다."),
 
     // COMMENT (1300–1399)
     COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "1300", "댓글을 찾을 수 없습니다."),

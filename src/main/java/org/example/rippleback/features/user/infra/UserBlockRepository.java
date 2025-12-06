@@ -39,6 +39,18 @@ public interface UserBlockRepository extends JpaRepository<UserBlock, Long> {
                                @Param("userB") Long userB);
 
 
+    @Query("""
+    SELECT CASE WHEN COUNT(b) > 0 THEN TRUE ELSE FALSE END
+    FROM UserBlock b
+    WHERE (b.blockerId = :userA AND b.blockedId = :userB)
+       OR (b.blockerId = :userB AND b.blockedId = :userA)
+""")
+    boolean existsAnyBlock(
+            @Param("userA") Long userA,
+            @Param("userB") Long userB
+    );
+
+
     default boolean existsMeBlockedTarget(Long meId, Long targetId) {
         return existsByBlockerIdAndBlockedId(meId, targetId);
     }

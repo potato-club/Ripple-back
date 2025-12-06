@@ -21,7 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -42,7 +41,6 @@ public class FeedService {
 
     public FeedResponseDto createFeed(Long userId, FeedRequestDto request) {
         Feed feed = feedMapper.toEntity(userId, request);
-
         feedRepository.save(feed);
 
         if (request.tags() != null) {
@@ -77,6 +75,7 @@ public class FeedService {
         return feedMapper.toResponse(feed, mediaUrlResolver);
     }
 
+
     public void deleteFeed(Long userId, Long feedId) {
         Feed feed = feedRepository.findById(feedId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FEED_NOT_FOUND));
@@ -86,6 +85,7 @@ public class FeedService {
 
         feed.softDelete();
     }
+
 
     public void deleteAllByAuthorId(Long authorId) {
         List<Feed> feeds = feedRepository.findByAuthorId(authorId);
@@ -97,6 +97,7 @@ public class FeedService {
     public FeedResponseDto getFeed(Long feedId, Long viewerId) {
         Feed feed = feedRepository.findById(feedId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FEED_NOT_FOUND));
+
         Long authorId = feed.getAuthorId();
         boolean blocked = userBlockRepository.existsByBlockerIdAndBlockedId(authorId, viewerId);
 
@@ -107,30 +108,43 @@ public class FeedService {
         return feedMapper.toResponse(feed, mediaUrlResolver);
     }
 
+
     public List<FeedResponseDto> getUserAllFeeds(Long viewerId) {
         List<Feed> feeds = feedRepository.findAllPublished();
 
         return feeds.stream()
-                .filter(feed -> !userBlockRepository.existsByBlockerIdAndBlockedId(feed.getAuthorId(), viewerId))
+                .filter(feed -> feedViewHistoryRepository.existsByUserIdAndFeedId(viewerId, feed.getId()))
                 .map(feed -> feedMapper.toResponse(feed, mediaUrlResolver))
                 .toList();
     }
 
-    public FeedPageDto getHomeFeeds(Long cursor, int limit, List<Long> blockedIds) {
+
+    public FeedPageDto getHomeFeeds(Long viewerId, Long cursor, int limit) {
         Pageable pageable = PageRequest.of(0, limit);
-        List<Long> safeBlockedIds = (blockedIds == null || blockedIds.isEmpty()) ? null : blockedIds;
-        List<Feed> feeds = feedRepository.findFeedsForHome(cursor, safeBlockedIds, pageable);
-        Long nextCursor = feeds.isEmpty() ? null : feeds.getLast().getId();
+        List<Feed> feeds = feedRepository.findFeedsForHome(cursor, pageable);
+        List<Feed> filtered = feeds.stream()
+                .filter(feed -> !userBlockRepository.existsAnyBlock(viewerId, feed.getAuthorId()))
+                .toList();
+
+        boolean hasNext = false;
+
+        if (filtered.size() > limit) {
+            hasNext = true;
+            filtered = filtered.subList(0, limit);
+        }
+
+        Long nextCursor = feeds.isEmpty() ? null : filtered.getLast().getId();
 
         return new FeedPageDto(
-                feeds.stream()
+                filtered.stream()
                         .map(feed -> feedMapper.toResponse(feed, mediaUrlResolver))
                         .toList(),
                 nextCursor,
-                feeds.size() == limit
+                hasNext
         );
 
     }
+
 
     public FeedFullViewDto getFeedFullView(Long userId, Long feedId) {
         Feed feed = feedRepository.findById(feedId)
@@ -147,7 +161,6 @@ public class FeedService {
             }
 
             user.decreaseCredits(1);
-
             feedViewHistoryRepository.save(FeedViewHistory.builder()
                     .userId(userId)
                     .feedId(feedId)
@@ -158,7 +171,6 @@ public class FeedService {
 
         boolean liked = feedLikeRepository.existsByFeedIdAndUserId(feedId, userId);
         boolean bookmarked = feedBookmarkRepository.existsByFeedIdAndUserId(feedId, userId);
-
         String videoHlsUrl = null;
         String videoSourceUrl = null;
         List<String> imageUrls = new ArrayList<>();
@@ -167,8 +179,7 @@ public class FeedService {
             boolean isVideo = !key.contains(".") && !key.endsWith("/");
 
             if (isVideo) {
-                // 영상의 경우: key = "videos/abc123"
-                videoHlsUrl = mediaUrlResolver.hlsManifestUrl(key);
+                videoHlsUrl = mediaUrlResolver.hlsManifestUrl(key); // 영상의 경우: key = "videos/abc123"
                 videoSourceUrl = mediaUrlResolver.videoSourceUrl(key, "mp4"); // 규칙에 따라 mp4 또는 다른 확장자
             }
 
@@ -203,50 +214,58 @@ public class FeedService {
 
     }
 
-    public void likeFeed(Long userId, Long feedId) {
+
+    public void addLike(Long userId, Long feedId) {
         Feed feed = feedRepository.findById(feedId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FEED_NOT_FOUND));
 
-        Optional<FeedLike> on = feedLikeRepository.findByFeedIdAndUserId(feedId, userId);
-
-        if (on.isPresent()) {
-            feedLikeRepository.delete(on.get());
-            feed.decreaseLikeCount();
-            return;
+        if (feedLikeRepository.existsByFeedIdAndUserId(feedId, userId)) {
+            throw new BusinessException(ErrorCode.ALREADY_LIKED_FEED);
         }
 
-        FeedLike like = FeedLike.builder()
-                .feed(feed)
-                .userId(userId)
-                .createdAt(Instant.now())
-                .build();
-
+        FeedLike like = FeedLike.create(feed, userId);
         feedLikeRepository.save(like);
-        feed.increaseLikeCount();
-        feedRepository.save(feed);
+        feedRepository.incrementLikeCount(feedId);
     }
 
-    public void bookmarkFeed(Long userId, Long feedId) {
-        Feed feed = feedRepository.findById(feedId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.FEED_NOT_FOUND));
-        Optional<FeedBookmark> on = feedBookmarkRepository.findByFeedIdAndUserId(feedId, userId);
 
-        if (on.isPresent()) {
-            feedBookmarkRepository.delete(on.get());
-            feed.decreaseBookmarkCount();
-            return;
+    public void removeLike(Long userId, Long feedId) {
+        int updated = feedRepository.decrementLikeCount(feedId);
+
+        if (updated == 0) {
+            throw new BusinessException(ErrorCode.INVALID_LIKE_STATE);
         }
 
-        FeedBookmark bookmark = FeedBookmark.builder()
-                .feed(feed)
-                .userId(userId)
-                .createdAt(Instant.now())
-                .build();
-
-        feedBookmarkRepository.save(bookmark);
-        feed.increaseBookmarkCount();
-        feedRepository.save(feed);
+        feedLikeRepository.deleteByUserIdAndFeedId(userId, feedId);
+        feedRepository.decrementLikeCount(feedId);
     }
+
+
+    public void addBookmark(Long userId, Long feedId) {
+        Feed feed = feedRepository.findById(feedId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.FEED_NOT_FOUND));
+
+        if (feedBookmarkRepository.existsByFeedIdAndUserId(feedId, userId)) {
+            throw new BusinessException(ErrorCode.ALREADY_BOOKMARKED);
+        }
+
+        FeedBookmark bookmark = FeedBookmark.create(feed, userId);
+        feedBookmarkRepository.save(bookmark);
+        feedRepository.incrementBookmarkCount(feedId);
+    }
+
+
+    public void removeBookmark(Long userId, Long feedId) {
+        int updated = feedRepository.decrementBookmarkCount(feedId);
+
+        if (updated == 0) {
+            throw new BusinessException(ErrorCode.INVALID_BOOKMARK_STATE);
+        }
+
+        feedBookmarkRepository.deleteByUserIdAndFeedId(userId, feedId);
+        feedRepository.decrementBookmarkCount(feedId);
+    }
+
 
     public List<String> searchTags(String keyword) {
         return tagRepository.searchByKeyword(keyword.toLowerCase().trim())
@@ -254,6 +273,7 @@ public class FeedService {
                 .map(FeedTag::getName)
                 .toList();
     }
+
 
     public List<FeedResponseDto> getFeedsByTag(String tagName) {
         FeedTag tag = tagRepository.findByName(tagName.toLowerCase().trim())

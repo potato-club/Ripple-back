@@ -20,7 +20,7 @@ public class FeedController {
 
     private final FeedService feedService;
 
-    @PostMapping
+    @PostMapping("/api/feeds")
     public FeedResponseDto createFeed(
             @AuthenticationPrincipal JwtPrincipal principal,
             @RequestBody FeedRequestDto request
@@ -28,7 +28,7 @@ public class FeedController {
         return feedService.createFeed(principal.userId(), request);
     }
 
-    @DeleteMapping("/{feedId}")
+    @DeleteMapping("/feeds/{feedId}")
     public void deleteFeed(
             @AuthenticationPrincipal JwtPrincipal principal,
             @PathVariable Long feedId
@@ -36,53 +36,69 @@ public class FeedController {
         feedService.deleteFeed(principal.userId(), feedId);
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/feeds/{id}")
     public FeedResponseDto getFeed(
-            @PathVariable Long id,
-            @AuthenticationPrincipal JwtPrincipal principal
+            @AuthenticationPrincipal JwtPrincipal principal,
+            @PathVariable Long id
     ) {
-        return  feedService.getFeed(id, principal.userId());
+        return feedService.getFeed(id, principal.userId());
     }
 
-    @GetMapping
+    @GetMapping("/feeds/viewed")
     public List<FeedResponseDto> getUserAllFeeds(
             @AuthenticationPrincipal JwtPrincipal principal
     ) {
         return feedService.getUserAllFeeds(principal.userId());
     }
 
-    @GetMapping
+    @GetMapping("/feeds/home")
     public FeedPageDto getHomeFeeds(
+            @AuthenticationPrincipal JwtPrincipal principal,
             @RequestParam(required = false) Long cursor,
-            @RequestParam(defaultValue = "10") int limit,
-            @RequestParam(value = "blockedIds", required = false) List<Long> blockedIds
+            @RequestParam(defaultValue = "10") int limit
     ){
-        return feedService.getHomeFeeds(cursor, limit, blockedIds);
+        return feedService.getHomeFeeds(principal.userId(), cursor, limit);
     }
 
-    @GetMapping("/{feedId}")
+    @GetMapping("/{feedId}/fullView")
     public ResponseEntity<FeedFullViewDto> getFeedFullView(
-            @PathVariable Long feedId,
-            @AuthenticationPrincipal JwtPrincipal principal
+            @AuthenticationPrincipal JwtPrincipal principal,
+            @PathVariable Long feedId
     ){
         FeedFullViewDto response = feedService.getFeedFullView(feedId, principal.userId());
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/{feedId}/like")
-    public void likeFeed(
+    @PostMapping("/{feedId}/addLikes")
+    public void addLike(
             @AuthenticationPrincipal JwtPrincipal principal,
             @PathVariable Long feedId
     ) {
-        feedService.likeFeed(principal.userId(), feedId);
+        feedService.addLike(principal.userId(), feedId);
     }
 
-    @PostMapping("/{feedId}/bookmark")
-    public void bookmarkFeed(
+    @PostMapping("/{feedId}/removeLikes")
+    public void removeLike(
             @AuthenticationPrincipal JwtPrincipal principal,
             @PathVariable Long feedId
     ) {
-        feedService.bookmarkFeed(principal.userId(), feedId);
+        feedService.removeLike(principal.userId(), feedId);
+    }
+
+    @PostMapping("/{feedId}/addBookmarks")
+    public void addBookmark(
+            @AuthenticationPrincipal JwtPrincipal principal,
+            @PathVariable Long feedId
+    ) {
+        feedService.addBookmark(principal.userId(), feedId);
+    }
+
+    @PostMapping("/{feedId}/removeBookmarks")
+    public void removeBookmark(
+            @AuthenticationPrincipal JwtPrincipal principal,
+            @PathVariable Long feedId
+    ) {
+        feedService.addBookmark(principal.userId(), feedId);
     }
 
     @GetMapping("/search/tag")
@@ -93,7 +109,9 @@ public class FeedController {
     }
 
     @GetMapping("/tag/{tagName}")
-    public List<FeedResponseDto> getFeedsByTag(@PathVariable String tagName) {
+    public List<FeedResponseDto> getFeedsByTag(
+            @PathVariable String tagName
+    ) {
         return feedService.getFeedsByTag(tagName);
     }
 }
