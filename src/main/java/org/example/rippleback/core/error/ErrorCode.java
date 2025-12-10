@@ -52,6 +52,8 @@ public enum ErrorCode {
     TAG_NOT_FOUND(HttpStatus.NOT_FOUND, "1209", "태그를 찾을 수 없습니다."),
     INVALID_BOOKMARK_STATE(HttpStatus.BAD_REQUEST, "1210", "잘못된 북마크 형식입니다."),
     INVALID_LIKE_STATE(HttpStatus.BAD_REQUEST, "1211", "잘못된 좋아요 형식입니다."),
+    ALREADY_REPORTED_FEED(HttpStatus.BAD_REQUEST, "1212", "이미 신고한 피드입니다."),
+    INVALID_UPDATE_OTHER(HttpStatus.BAD_REQUEST, "1213", "다른 사람의 피드를 수정할 수 없습니다."),
 
     // COMMENT (1300–1399)
     COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "1300", "댓글을 찾을 수 없습니다."),

@@ -3,10 +3,7 @@ package org.example.rippleback.features.feed.app;
 import lombok.RequiredArgsConstructor;
 import org.example.rippleback.core.error.BusinessException;
 import org.example.rippleback.core.error.ErrorCode;
-import org.example.rippleback.features.feed.api.dto.FeedFullViewDto;
-import org.example.rippleback.features.feed.api.dto.FeedPageDto;
-import org.example.rippleback.features.feed.api.dto.FeedRequestDto;
-import org.example.rippleback.features.feed.api.dto.FeedResponseDto;
+import org.example.rippleback.features.feed.api.dto.*;
 import org.example.rippleback.features.feed.domain.*;
 import org.example.rippleback.features.feed.infra.*;
 import org.example.rippleback.features.media.app.MediaUrlResolver;
@@ -37,6 +34,7 @@ public class FeedService {
     private final FeedViewHistoryRepository feedViewHistoryRepository;
     private final UserRepository userRepository;
     private final FeedTagRelationRepository feedTagRelationRepository;
+    private final FeedReportRepository feedReportRepository;
 
 
     public FeedResponseDto createFeed(Long userId, FeedRequestDto request) {
@@ -73,6 +71,18 @@ public class FeedService {
         }
 
         return feedMapper.toResponse(feed, mediaUrlResolver);
+    }
+
+
+    public void changeVisibility(Long userId, Long feedId, ChangeVisibilityRequestDto request) {
+        Feed feed = feedRepository.findById(feedId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.FEED_NOT_FOUND));
+
+        if (!feed.getAuthorId().equals(userId)) {
+            throw new BusinessException(ErrorCode.INVALID_UPDATE_OTHER);
+        }
+
+        feed.updateVisibility(request.visibility());
     }
 
 
@@ -212,6 +222,32 @@ public class FeedService {
                 .createdAt(feed.getCreatedAt())
                 .build();
 
+    }
+
+
+    public FeedReportResponseDto reportFeed(Long feedId, Long reporterId, FeedReportRequestDto request){
+         Feed feed = feedRepository.findById(feedId)
+                 .orElseThrow(() -> new BusinessException(ErrorCode.FEED_NOT_FOUND));
+
+         boolean alreadyReported = feedReportRepository.existsByUserIdAndFeedId(reporterId, feedId);
+         if (alreadyReported) {
+             throw new BusinessException(ErrorCode.ALREADY_REPORTED_FEED);
+        }
+
+         FeedReport report = FeedReport.builder()
+                 .feedId(feedId)
+                 .reporterId(reporterId)
+                 .reason(request.reason())
+                 .description(request.description())
+                 .createdAt(Instant.now())
+                 .build();
+
+        feedReportRepository.save(report);
+        return new FeedReportResponseDto(
+                feedId,
+                reporterId,
+                "신고가 정상적으로 접수되었습니다."
+        );
     }
 
 

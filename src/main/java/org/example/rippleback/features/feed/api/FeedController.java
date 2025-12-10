@@ -1,11 +1,9 @@
 package org.example.rippleback.features.feed.api;
 
 import lombok.RequiredArgsConstructor;
+import org.example.rippleback.common.dto.ApiResponse;
 import org.example.rippleback.core.security.jwt.JwtPrincipal;
-import org.example.rippleback.features.feed.api.dto.FeedFullViewDto;
-import org.example.rippleback.features.feed.api.dto.FeedPageDto;
-import org.example.rippleback.features.feed.api.dto.FeedRequestDto;
-import org.example.rippleback.features.feed.api.dto.FeedResponseDto;
+import org.example.rippleback.features.feed.api.dto.*;
 import org.example.rippleback.features.feed.app.FeedService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,6 +24,16 @@ public class FeedController {
             @RequestBody FeedRequestDto request
     ) {
         return feedService.createFeed(principal.userId(), request);
+    }
+
+    @PatchMapping("/{feedId}/visibility")
+    public ApiResponse<Void> changeVisibility(
+            @AuthenticationPrincipal JwtPrincipal principal,
+            @PathVariable Long feedId,
+            @RequestBody ChangeVisibilityRequestDto request
+    ) {
+        feedService.changeVisibility(principal.userId(), feedId, request);
+        return ApiResponse.ok();
     }
 
     @DeleteMapping("/feeds/{feedId}")
@@ -67,6 +75,16 @@ public class FeedController {
     ){
         FeedFullViewDto response = feedService.getFeedFullView(feedId, principal.userId());
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{feedId}/report")
+    public ApiResponse<FeedReportResponseDto> reportFeed(
+            @AuthenticationPrincipal JwtPrincipal principal,
+            @PathVariable Long feedId,
+            @RequestBody FeedReportRequestDto request
+    ) {
+        FeedReportResponseDto response = feedService.reportFeed(feedId, principal.userId(), request);
+        return ApiResponse.ok(response);
     }
 
     @PostMapping("/{feedId}/addLikes")

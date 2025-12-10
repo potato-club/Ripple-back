@@ -36,7 +36,7 @@ ORDER BY feed.id DESC
 SELECT feed FROM Feed feed
 WHERE feed.status = 'PUBLISHED'
 AND (:cursor IS NULL OR feed.id < :cursor)
-ORDER BY feed.id DESC
+ORDER BY (feed.id * 13) % 10007 DESC, feed.id DESC
 """)
     List<Feed> findFeedsForHome(@Param("cursor") Long cursor, Pageable pageable);
 
