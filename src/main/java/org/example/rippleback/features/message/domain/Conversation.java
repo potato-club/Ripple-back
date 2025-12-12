@@ -4,7 +4,10 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.example.rippleback.features.user.domain.User;
 
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 @Entity
@@ -26,12 +29,26 @@ public class Conversation {
             joinColumns = @JoinColumn(name = "conversation_id"),
             inverseJoinColumns = @JoinColumn(name = "user_id")
     )
-    @Builder.Default
     private Set<User> participants = new HashSet<>();
 
     @OneToMany(mappedBy = "conversation", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private Set<Message> messages = new HashSet<>();
+    @OrderBy("sentAt ASC")
+    private List<Message> messages = new ArrayList<>();
+
+    @Column
+    private String lastMessageContent;
+
+    @Column
+    private Instant lastMessageAt;
+
+    @Column
+    private Long lastMessageId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ConversationType type; // DM, GROUP
+
+
 
     public boolean hasParticipant(User user) {
         return participants.contains(user);

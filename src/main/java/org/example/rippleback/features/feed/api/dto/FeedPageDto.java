@@ -6,5 +6,6 @@ public record FeedPageDto(
         List<FeedResponseDto> feeds,
         Long nextCursor,
         boolean hasNest
+
 ) {
 }
