@@ -36,7 +36,7 @@ public class FeedReport {
     @Column(columnDefinition = "text")
     private String description;
 
-    @Column(name = "created_at", columnDefinition = "TIMESTAMPZ", nullable = false)
+    @Column(name = "created_at", columnDefinition = "TIMESTAMPTZ", nullable = false)
     private Instant createdAt;
 
     @PrePersist
