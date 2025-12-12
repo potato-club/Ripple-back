@@ -32,13 +32,12 @@ public interface FeedRepository extends JpaRepository<Feed, Long> {
             """)
     List<Feed> findByIdIn(@Param("ids") List<Long> ids);
 
-    @Query(value = """
+    @Query("""
             SELECT feed FROM Feed feed
             WHERE feed.status = 'PUBLISHED'
             AND (:cursor IS NULL OR feed.id < :cursor)
-            ORDER BY (feed.id * 13) % 10007 DESC, feed.id DESC
-            """,
-            nativeQuery = true)
+            ORDER BY mod(feed.id * 13, 10007) DESC, feed.id DESC
+            """)
     List<Feed> findFeedsForHome(@Param("cursor") Long cursor, Pageable pageable);
 
     @Modifying
