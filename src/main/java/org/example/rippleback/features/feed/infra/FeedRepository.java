@@ -18,76 +18,77 @@ public interface FeedRepository extends JpaRepository<Feed, Long> {
     List<Feed> findByAuthorId(Long authorId);
 
     @Query("""
-SELECT feed FROM Feed feed
-WHERE feed.status = 'PUBLISHED'
-ORDER BY feed.id DESC
-""")
+            SELECT feed FROM Feed feed
+            WHERE feed.status = 'PUBLISHED'
+            ORDER BY feed.id DESC
+            """)
     List<Feed> findAllPublished();
 
     @Query("""
-SELECT feed FROM Feed feed
-WHERE feed.status = 'PUBLISHED'
-AND (:ids IS NULL OR feed.id IN :ids)
-ORDER BY feed.id DESC
-""")
+            SELECT feed FROM Feed feed
+            WHERE feed.status = 'PUBLISHED'
+            AND (:ids IS NULL OR feed.id IN :ids)
+            ORDER BY feed.id DESC
+            """)
     List<Feed> findByIdIn(@Param("ids") List<Long> ids);
 
-    @Query("""
-SELECT feed FROM Feed feed
-WHERE feed.status = 'PUBLISHED'
-AND (:cursor IS NULL OR feed.id < :cursor)
-ORDER BY (feed.id * 13) % 10007 DESC, feed.id DESC
-""")
+    @Query(value = """
+            SELECT feed FROM Feed feed
+            WHERE feed.status = 'PUBLISHED'
+            AND (:cursor IS NULL OR feed.id < :cursor)
+            ORDER BY (feed.id * 13) % 10007 DESC, feed.id DESC
+            """,
+            nativeQuery = true)
     List<Feed> findFeedsForHome(@Param("cursor") Long cursor, Pageable pageable);
 
     @Modifying
     @Query("""
-update Feed f
-set f.likeCount = f.likeCount + 1
-where f.id = :feedId
-""")
+            update Feed f
+            set f.likeCount = f.likeCount + 1
+            where f.id = :feedId
+            """)
     void incrementLikeCount(@Param("feedId") Long feedId);
 
     @Modifying
     @Query("""
-update Feed f
-set f.likeCount = f.likeCount - 1
-where f.id = :feedId
-and f.likeCount > 0
-""")
+            update Feed f
+            set f.likeCount = f.likeCount - 1
+            where f.id = :feedId
+            and f.likeCount > 0
+            """)
     int decrementLikeCount(@Param("feedId") Long feedId);
 
     @Modifying
     @Query("""
-update Feed f
-set f.bookmarkCount = f.bookmarkCount + 1
-where f.id = :feedId
-""")
+            update Feed f
+            set f.bookmarkCount = f.bookmarkCount + 1
+            where f.id = :feedId
+            """)
     void incrementBookmarkCount(@Param("feedId") Long feedId);
 
     @Modifying
     @Query("""
-update Feed f
-set f.bookmarkCount = f.bookmarkCount - 1
-where f.id = :feedId
-and f.bookmarkCount > 0
-""")
+            update Feed f
+            set f.bookmarkCount = f.bookmarkCount - 1
+            where f.id = :feedId
+            and f.bookmarkCount > 0
+            """)
     int decrementBookmarkCount(@Param("feedId") Long feedId);
 
     @Modifying(clearAutomatically = true)
     @Query("""
-update Feed f
-set f.commentCount = f.commentCount + 1
-where f.id = :feedId
-""")
+            update Feed f
+            set f.commentCount = f.commentCount + 1
+            where f.id = :feedId
+            """)
     int incrementCommentCount(@Param("feedId") Long feedId);
 
     @Modifying(clearAutomatically = true)
     @Query("""
-update Feed f
-set f.commentCount = f.commentCount - 1
-where f.id = :feedId
-and f.commentCount > 0
-""")
+            update Feed f
+            set f.commentCount = f.commentCount - 1
+            where f.id = :feedId
+            and f.commentCount > 0
+            """)
     int decrementCommentCount(@Param("feedId") Long feedId);
 }
