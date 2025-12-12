@@ -229,7 +229,7 @@ public class FeedService {
          Feed feed = feedRepository.findById(feedId)
                  .orElseThrow(() -> new BusinessException(ErrorCode.FEED_NOT_FOUND));
 
-         boolean alreadyReported = feedReportRepository.existsByUserIdAndFeedId(reporterId, feedId);
+         boolean alreadyReported = feedReportRepository.existsByReporterIdAndFeedId(reporterId, feedId);
          if (alreadyReported) {
              throw new BusinessException(ErrorCode.ALREADY_REPORTED_FEED);
         }
