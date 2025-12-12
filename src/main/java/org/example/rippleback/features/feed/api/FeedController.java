@@ -18,7 +18,7 @@ public class FeedController {
 
     private final FeedService feedService;
 
-    @PostMapping("/api/feeds")
+    @PostMapping
     public FeedResponseDto createFeed(
             @AuthenticationPrincipal JwtPrincipal principal,
             @RequestBody FeedRequestDto request
@@ -36,7 +36,7 @@ public class FeedController {
         return ApiResponse.ok();
     }
 
-    @DeleteMapping("/feeds/{feedId}")
+    @DeleteMapping("/{feedId}")
     public void deleteFeed(
             @AuthenticationPrincipal JwtPrincipal principal,
             @PathVariable Long feedId
@@ -44,22 +44,22 @@ public class FeedController {
         feedService.deleteFeed(principal.userId(), feedId);
     }
 
-    @GetMapping("/feeds/{id}")
+    @GetMapping("/{feedId}")
     public FeedResponseDto getFeed(
             @AuthenticationPrincipal JwtPrincipal principal,
-            @PathVariable Long id
+            @PathVariable Long feedId
     ) {
-        return feedService.getFeed(id, principal.userId());
+        return feedService.getFeed(feedId, principal.userId());
     }
 
-    @GetMapping("/feeds/viewed")
+    @GetMapping("/viewed")
     public List<FeedResponseDto> getUserAllFeeds(
             @AuthenticationPrincipal JwtPrincipal principal
     ) {
         return feedService.getUserAllFeeds(principal.userId());
     }
 
-    @GetMapping("/feeds/home")
+    @GetMapping("/home")
     public FeedPageDto getHomeFeeds(
             @AuthenticationPrincipal JwtPrincipal principal,
             @RequestParam(required = false) Long cursor,
@@ -73,8 +73,7 @@ public class FeedController {
             @AuthenticationPrincipal JwtPrincipal principal,
             @PathVariable Long feedId
     ){
-        FeedFullViewDto response = feedService.getFeedFullView(feedId, principal.userId());
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(feedService.getFeedFullView(feedId, principal.userId()));
     }
 
     @PostMapping("/{feedId}/report")
@@ -83,53 +82,36 @@ public class FeedController {
             @PathVariable Long feedId,
             @RequestBody FeedReportRequestDto request
     ) {
-        FeedReportResponseDto response = feedService.reportFeed(feedId, principal.userId(), request);
-        return ApiResponse.ok(response);
+        return ApiResponse.ok(feedService.reportFeed(feedId, principal.userId(), request));
     }
 
-    @PostMapping("/{feedId}/addLikes")
-    public void addLike(
-            @AuthenticationPrincipal JwtPrincipal principal,
-            @PathVariable Long feedId
-    ) {
+    @PostMapping("/{feedId}/likes")
+    public void addLike(@AuthenticationPrincipal JwtPrincipal principal, @PathVariable Long feedId) {
         feedService.addLike(principal.userId(), feedId);
     }
 
-    @PostMapping("/{feedId}/removeLikes")
-    public void removeLike(
-            @AuthenticationPrincipal JwtPrincipal principal,
-            @PathVariable Long feedId
-    ) {
+    @DeleteMapping("/{feedId}/likes")
+    public void removeLike(@AuthenticationPrincipal JwtPrincipal principal, @PathVariable Long feedId) {
         feedService.removeLike(principal.userId(), feedId);
     }
 
-    @PostMapping("/{feedId}/addBookmarks")
-    public void addBookmark(
-            @AuthenticationPrincipal JwtPrincipal principal,
-            @PathVariable Long feedId
-    ) {
+    @PostMapping("/{feedId}/bookmarks")
+    public void addBookmark(@AuthenticationPrincipal JwtPrincipal principal, @PathVariable Long feedId) {
         feedService.addBookmark(principal.userId(), feedId);
     }
 
-    @PostMapping("/{feedId}/removeBookmarks")
-    public void removeBookmark(
-            @AuthenticationPrincipal JwtPrincipal principal,
-            @PathVariable Long feedId
-    ) {
-        feedService.addBookmark(principal.userId(), feedId);
+    @DeleteMapping("/{feedId}/bookmarks")
+    public void removeBookmark(@AuthenticationPrincipal JwtPrincipal principal, @PathVariable Long feedId) {
+        feedService.removeBookmark(principal.userId(), feedId);
     }
 
     @GetMapping("/search/tag")
-    public List<String> searchTags(
-            @RequestParam String query
-    ) {
+    public List<String> searchTags(@RequestParam String query) {
         return feedService.searchTags(query);
     }
 
     @GetMapping("/tag/{tagName}")
-    public List<FeedResponseDto> getFeedsByTag(
-            @PathVariable String tagName
-    ) {
+    public List<FeedResponseDto> getFeedsByTag(@PathVariable String tagName) {
         return feedService.getFeedsByTag(tagName);
     }
 }

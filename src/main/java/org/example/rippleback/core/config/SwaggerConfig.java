@@ -26,7 +26,7 @@ public class SwaggerConfig {
     public GroupedOpenApi authApi() {
         return GroupedOpenApi.builder()
                 .group("auth")
-                .pathsToMatch("/api/auth/**")
+                .packagesToScan("org.example.rippleback.features.auth.api")
                 .build();
     }
 
@@ -34,7 +34,15 @@ public class SwaggerConfig {
     public GroupedOpenApi userApi() {
         return GroupedOpenApi.builder()
                 .group("users")
-                .pathsToMatch("/api/users/**")
+                .packagesToScan("org.example.rippleback.features.user.api")
+                .build();
+    }
+
+    @Bean
+    public GroupedOpenApi feedApi() {
+        return GroupedOpenApi.builder()
+                .group("feeds")
+                .packagesToScan("org.example.rippleback.features.feed.api")
                 .build();
     }
 
@@ -42,11 +50,16 @@ public class SwaggerConfig {
     public GroupedOpenApi commentApi() {
         return GroupedOpenApi.builder()
                 .group("comments")
-                .pathsToMatch(
-                        "/api/feeds/*/comments",
-                        "/api/feeds/*/comments/**",
-                        "/api/comments/**"
-                )
+                .packagesToScan("org.example.rippleback.features.comment.api")
                 .build();
     }
+
+    @Bean
+    public GroupedOpenApi messageApi() {
+        return GroupedOpenApi.builder()
+                .group("messages")
+                .packagesToScan("org.example.rippleback.features.message.api")
+                .build();
+    }
+
 }
