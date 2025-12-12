@@ -1,6 +1,8 @@
 package org.example.rippleback.features.message.app;
 
 import lombok.RequiredArgsConstructor;
+import org.example.rippleback.core.error.BusinessException;
+import org.example.rippleback.core.error.ErrorCode;
 import org.example.rippleback.features.message.api.dto.MessageRequestDto;
 import org.example.rippleback.features.message.domain.Conversation;
 import org.example.rippleback.features.message.domain.Message;
@@ -14,25 +16,25 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
+@Transactional
 public class MessageService {
 
     private final MessageRepository messageRepository;
     private final ConversationRepository conversationRepository;
 
-    @Transactional
     public Message sendMessage(User sender, MessageRequestDto requestDto) {
         Conversation conversation = conversationRepository.findById(requestDto.conversationId())
-                .orElseThrow(() -> new IllegalStateException("대화방을 찾을 수 없습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_CONVERSATION));
 
         if (!conversation.hasParticipant(sender)) {
-            throw new IllegalStateException("대화 참여자가 아닙니다.");
+            throw new BusinessException(ErrorCode.NOT_CONTAIN_CONVERSATION);
         }
 
         Message message = Message.builder()
                 .conversation(conversation)
                 .sender(sender)
                 .content(requestDto.content())
+                .messageType(requestDto.messageType())
                 .build();
 
         return messageRepository.save(message);

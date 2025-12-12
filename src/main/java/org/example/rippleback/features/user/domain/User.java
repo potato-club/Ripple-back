@@ -2,6 +2,8 @@ package org.example.rippleback.features.user.domain;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.example.rippleback.core.error.BusinessException;
+import org.example.rippleback.core.error.ErrorCode;
 import org.example.rippleback.features.media.domain.Media;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -45,6 +47,10 @@ public class User {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "profile_media_id", insertable = false, updatable = false)
     private Media profileMedia;
+
+    @Builder.Default
+    @Column(nullable = false)
+    private int credits = 10;
 
     @Builder.Default
     @Column(name = "is_email_verified", nullable = false)
@@ -112,5 +118,19 @@ public class User {
 
     public void changePassword(String encodedPassword) {
         this.password = encodedPassword;
+    }
+
+    public void decreaseCredits(int amount) {
+        if (this.credits < amount) {
+            throw new BusinessException(ErrorCode.NOT_ENOUGH_CREDITS);
+        }
+        this.credits -= amount;
+    }
+
+    public void increaseCredit(int amount) {
+        if (this.credits >= 30) {
+            throw new BusinessException(ErrorCode.FULL_CREDITS);
+        }
+        this.credits += amount;
     }
 }

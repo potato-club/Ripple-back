@@ -28,4 +28,13 @@ public class FeedLike {
 
     @Column(nullable = false)
     private Instant createdAt;
+
+    public static FeedLike create(Feed feed, Long userId) {
+        return new FeedLike(
+                null,
+                userId,
+                feed,
+                Instant.now()
+        );
+    }
 }
