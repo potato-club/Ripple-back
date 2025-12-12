@@ -41,15 +41,15 @@ public class Feed {
     @Builder.Default
     private String[] tagsNorm = new String[0];
 
-    @Column(name = "created_at", columnDefinition = "TIMESTAMPZ", nullable = false)
+    @Column(name = "created_at", columnDefinition = "TIMESTAMPTZ", nullable = false)
     @Builder.Default
     private Instant createdAt = Instant.now();
 
-    @Column(name = "updated_at", columnDefinition = "TIMESTAMPZ", nullable = false)
+    @Column(name = "updated_at", columnDefinition = "TIMESTAMPTZ", nullable = false)
     @Builder.Default
     private Instant updatedAt = Instant.now();
 
-    @Column(name = "deleted_at", columnDefinition = "TIMESTAMPZ")
+    @Column(name = "deleted_at", columnDefinition = "TIMESTAMPTZ")
     private Instant deletedAt;
 
     @Column(name = "like_count", nullable = false)
