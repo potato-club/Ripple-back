@@ -4,5 +4,5 @@ import org.example.rippleback.features.feed.domain.FeedReport;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface FeedReportRepository extends JpaRepository<FeedReport, Long> {
-    boolean existsByUserIdAndFeedId(Long userId, Long feedId);
+    boolean existsByReporterIdAndFeedId(Long userId, Long feedId);
 }
