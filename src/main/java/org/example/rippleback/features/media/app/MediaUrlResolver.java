@@ -10,7 +10,7 @@ import java.util.Objects;
 public class MediaUrlResolver {
     private final String base;
 
-    public MediaUrlResolver(@Value("${cdn.base-url}") String baseUrl) {
+    public MediaUrlResolver(@Value("${CDN_BASE_URL}") String baseUrl) {
         if (baseUrl == null || baseUrl.isBlank()) {
             throw new IllegalStateException("cdn.base-url must be set");
         }

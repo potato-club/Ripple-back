@@ -203,6 +203,9 @@ public class UserService {
                 mediaRepo.save(media);
 
                 me.updateProfileImage(media.getId());
+
+                em.flush();
+                em.refresh(me);
             }
         }
 
