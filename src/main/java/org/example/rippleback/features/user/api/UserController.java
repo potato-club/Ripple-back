@@ -151,7 +151,7 @@ public class UserController {
             summary = "프로필 수정",
             description = """
                     AccessToken 필요.
-                    - username: 변경할 유저네임(옵션)
+                    - username: 변경할 유저네임
                     - profileImage:
                       - action=KEEP  : 프로필 이미지 변경 없음(기본값)
                       - action=CLEAR : 프로필 이미지 제거
@@ -199,5 +199,87 @@ public class UserController {
     ) {
         userService.softDelete(p.userId());
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(
+            summary = "팔로우",
+            description = "AccessToken 필요. targetId 사용자를 팔로우합니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "팔로우 성공"),
+            @ApiResponse(responseCode = "409", description = "이미 팔로우한 상태 등")
+    })
+    @PutMapping("/me/followings/{targetId}")
+    public ResponseEntity<FollowResponseDto> follow(
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal p,
+            @PathVariable Long targetId
+    ) {
+        return ResponseEntity.ok(userService.follow(p.userId(), targetId));
+    }
+
+    @Operation(
+            summary = "언팔로우",
+            description = "AccessToken 필요. targetId 사용자를 언팔로우합니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "언팔로우 성공(또는 이미 언팔 상태여도 멱등 삭제로 처리 가능)")
+    })
+    @DeleteMapping("/me/followings/{targetId}")
+    public ResponseEntity<Void> unfollow(
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal p,
+            @PathVariable Long targetId
+    ) {
+        userService.unfollow(p.userId(), targetId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(
+            summary = "차단",
+            description = "AccessToken 필요. targetId 사용자를 차단합니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "차단 성공"),
+            @ApiResponse(responseCode = "409", description = "이미 내가 차단한 상태")
+    })
+    @PutMapping("/me/blocks/{targetId}")
+    public ResponseEntity<BlockResponseDto> block(
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal p,
+            @PathVariable Long targetId
+    ) {
+        return ResponseEntity.ok(userService.block(p.userId(), targetId));
+    }
+
+    @Operation(
+            summary = "차단 해제",
+            description = "AccessToken 필요. 내가 차단한 targetId 사용자를 차단 해제합니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "차단 해제 성공(없어도 삭제는 멱등으로 처리 가능)")
+    })
+    @DeleteMapping("/me/blocks/{targetId}")
+    public ResponseEntity<Void> unblock(
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal p,
+            @PathVariable Long targetId
+    ) {
+        userService.unblock(p.userId(), targetId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(
+            summary = "내 차단 목록 조회",
+            description = """
+                AccessToken 필요. 내가 차단한 사용자 목록을 커서 페이징으로 조회합니다.
+                - cursor: 마지막 항목의 id(다음 페이지 조회용)
+                - size: 1~50 권장
+                """
+    )
+    @ApiResponse(responseCode = "200", description = "차단 목록 반환")
+    @GetMapping("/me/blocks")
+    public ResponseEntity<PageCursorResponse<UserSummaryDto>> listMyBlocks(
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal p,
+            @RequestParam(required = false) Long cursor,
+            @RequestParam(required = false, defaultValue = "20") Integer size
+    ) {
+        return ResponseEntity.ok(userService.listMyBlocks(p.userId(), cursor, size));
     }
 }

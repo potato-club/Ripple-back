@@ -203,6 +203,9 @@ public class UserService {
                 mediaRepo.save(media);
 
                 me.updateProfileImage(media.getId());
+
+                em.flush();
+                em.refresh(me);
             }
         }
 
@@ -234,14 +237,16 @@ public class UserService {
         refreshTokenService.deleteAll(me.getId());
     }
 
+    // 팔로우 하기 전 제약조건 확인하고 팔로우 생성
     @Transactional
     public FollowResponseDto follow(Long meId, Long targetId) {
         if (meId.equals(targetId)) throw new BusinessException(ErrorCode.CANNOT_FOLLOW_SELF);
-        User target = userRepository.findById(targetId).orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-        if (target.getStatus() == UserStatus.SUSPENDED) throw new BusinessException(ErrorCode.USER_INACTIVE);
-        if (target.getStatus() == UserStatus.DELETED) throw new BusinessException(ErrorCode.USER_NOT_FOUND);
-        if (userBlockRepo.existsMeBlockedTarget(meId, targetId))
-            throw new BusinessException(ErrorCode.FOLLOW_NOT_ALLOWED_YOU_BLOCKED_TARGET);
+
+        // 대상이 되는 유저 상태 체크
+        loadActiveForWrite(targetId);
+
+        ensureNoBlockBetween(meId, targetId);
+
         if (userFollowRepo.existsByFollowerIdAndFollowingId(meId, targetId))
             throw new BusinessException(ErrorCode.FOLLOW_ALREADY_EXISTS);
 
@@ -253,22 +258,29 @@ public class UserService {
         return new FollowResponseDto(meId, targetId, true);
     }
 
+    // 팔로우 해제는 데이터 삭제 (멱등조치 Repo에서 해둠)
     @Transactional
     public void unfollow(Long meId, Long targetId) {
         userFollowRepo.deleteLink(meId, targetId);
     }
 
+    // 차단하기 전에 제약조건 확인 후 차단 생성
     @Transactional
     public BlockResponseDto block(Long meId, Long targetId) {
+        // 자체 차단 금지
         if (meId.equals(targetId)) throw new BusinessException(ErrorCode.CANNOT_BLOCK_SELF);
-        User target = userRepository.findById(targetId).orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-        if (target.getStatus() == UserStatus.SUSPENDED) throw new BusinessException(ErrorCode.USER_INACTIVE);
-        if (target.getStatus() == UserStatus.DELETED) throw new BusinessException(ErrorCode.USER_NOT_FOUND);
-        if (userBlockRepo.existsMeBlockedTarget(meId, targetId)) throw new BusinessException(ErrorCode.BLOCK_ALREADY_EXISTS);
 
+        // 대상이 되는 유저 상태 체크
+        loadActiveForWrite(targetId);
+
+        // 이미 차단 관계 존재하면 차단 불가능
+        ensureNotAlreadyBlockedByMe(meId, targetId);
+
+        // 차단 만들어지면 서로 팔로우 관계 해제
         userFollowRepo.deleteLink(meId, targetId);
         userFollowRepo.deleteLink(targetId, meId);
 
+        // 나와 상대방 users 테이블 업데이트
         UserBlock b = UserBlock.builder()
                 .blocker(em.getReference(User.class, meId))
                 .blocked(em.getReference(User.class, targetId))
@@ -277,18 +289,39 @@ public class UserService {
         return new BlockResponseDto(meId, targetId, true);
     }
 
+    // 차단 해제는 데이터 삭제 (Repo에서 멱등조건 해둠)
     @Transactional
     public void unblock(Long meId, Long targetId) {
-        userBlockRepo.deleteLink(meId, targetId);
+        userBlockRepo.deleteBlockLink(meId, targetId);
     }
 
+    // 유저의 팔로우 한 목록 조회 (보는 유저가 viewer, 목록 보여주는 유저가 ownerId)
     @Transactional(readOnly = true)
-    public PageCursorResponse<UserSummaryDto> listFollowers(Long userId, Long cursor, int size) {
-        int pageSize = Math.max(1, Math.min(size, 50));
+    public PageCursorResponse<UserSummaryDto> listFollowers(Long viewerId, Long userId, Long cursor, int size) {
+        // 페이지를 size 받은거 혹은 20 중에 최소값으로 사용
+        int pageSize = Math.max(1, Math.min(size, 20));
 
-        var edges = (cursor == null)
-                ? userFollowRepo.findByFollowingIdOrderByIdDesc(userId, PageRequest.of(0, pageSize))
-                : userFollowRepo.findByFollowingIdAndIdLessThanOrderByIdDesc(userId, cursor, PageRequest.of(0, pageSize));
+        // 목록 보려는 유저가 존재하는 유저인지 확인
+        User owner = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        // 목록 보려는 유저 계정이 활성화 상태인지 확인
+        if (owner.getStatus() != UserStatus.ACTIVE) {
+            throw new BusinessException(ErrorCode.USER_INACTIVE);
+        }
+
+        // 목록을 보려는 유저와 목록 보이는 유저가 차단 관계 있으면 예외 반환 (프로필에서도 설정하지만 여기서도 설정)
+        if (userBlockRepo.existsAnyBlock(viewerId, userId)) {
+            throw new BusinessException(ErrorCode.BLOCK_ALREADY_EXISTS);
+        }
+
+        // 3) 목록 아이템은 "viewer 기준으로 차단 관계가 있는 팔로워는 제외"한 DB 결과 사용
+        var edges = userFollowRepo.findFollowersVisibleTo(
+                userId,
+                viewerId,
+                cursor,
+                PageRequest.of(0, pageSize)
+        );
 
         var items = edges.stream()
                 .map(e -> userMapper.toSummary(e.getFollower()))
@@ -297,48 +330,65 @@ public class UserService {
         String next = edges.size() == pageSize
                 ? String.valueOf(edges.get(edges.size() - 1).getId())
                 : null;
+
         return new PageCursorResponse<>(items, next, next != null);
     }
 
+
     @Transactional(readOnly = true)
-    public PageCursorResponse<UserSummaryDto> listFollowings(Long userId, Long cursor, int size) {
+    public PageCursorResponse<UserSummaryDto> listMyBlocks(Long meId, Long cursor, int size) {
+        // 내 상태 체크
+        loadActiveForWrite(meId);
+
         int pageSize = Math.max(1, Math.min(size, 50));
-        var edges = (cursor == null)
-                ? userFollowRepo.findByFollowerIdOrderByIdDesc(userId, PageRequest.of(0, pageSize))
-                : userFollowRepo.findByFollowerIdAndIdLessThanOrderByIdDesc(userId, cursor, PageRequest.of(0, pageSize));
+        var edges = userBlockRepo.findBlocks(meId, cursor, PageRequest.of(0, pageSize));
 
         var items = edges.stream()
-                .map(e -> userMapper.toSummary(e.getFollowing()))
+                .map(UserBlock::getBlocked)
+                .map(userMapper::toSummary)
                 .toList();
 
         String next = edges.size() == pageSize
                 ? String.valueOf(edges.get(edges.size() - 1).getId())
                 : null;
-        return new PageCursorResponse<>(items, next, next != null);
-    }
 
-    @Transactional(readOnly = true)
-    public PageCursorResponse<UserSummaryDto> listMyBlocks(Long meId, Long cursor, int size) {
-        int pageSize = Math.max(1, Math.min(size, 50));
-        var edges = userBlockRepo.findBlocks(meId, cursor, PageRequest.of(0, pageSize));
-        var items = edges.stream().map(e -> userMapper.toSummary(e.getBlocked())).toList();
-        String next = edges.size() == pageSize ? String.valueOf(edges.get(edges.size() - 1).getId()) : null;
         return new PageCursorResponse<>(items, next, next != null);
     }
 
     @Transactional(readOnly = true)
     public AvailabilityResponse availability(String username, String email) {
-        Boolean u = username == null ? null : !userRepository.existsByUsernameIgnoreCaseAndDeletedAtIsNull(username);
-        Boolean e = email == null ? null : !userRepository.existsByEmailIgnoreCaseAndDeletedAtIsNull(email);
+        Boolean u = username == null
+                ? null
+                : !userRepository.existsByUsernameIgnoreCaseAndDeletedAtIsNull(username);
+        Boolean e = email == null
+                ? null
+                : !userRepository.existsByEmailIgnoreCaseAndDeletedAtIsNull(email);
         return new AvailabilityResponse(u, e);
     }
 
     private User loadActiveForWrite(Long userId) {
-        User u = userRepository.findById(userId).orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-        if (u.getStatus() == UserStatus.SUSPENDED) throw new BusinessException(ErrorCode.USER_INACTIVE);
-        if (u.getStatus() == UserStatus.DELETED) throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        User u = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        if(u.getStatus() != UserStatus.ACTIVE) throw new BusinessException(ErrorCode.USER_INACTIVE);
         return u;
     }
+
+    // 프로필, 피드, 댓글, DM 의 경우에 서로간에 Block 존재하면 상대방 데이터 안보임
+    // 그걸 위해서 이걸로 체크하고 넘어감
+    private void ensureNoBlockBetween(Long meId, Long targetId) {
+        if (userBlockRepo.existsAnyBlock(meId, targetId)) {
+            throw new BusinessException(ErrorCode.BLOCK_ALREADY_EXISTS);
+        }
+    }
+
+    // 내가 상대방 차단 했는지 확인하기 위한 메서드
+    private void ensureNotAlreadyBlockedByMe(Long meId, Long targetId) {
+        if (userBlockRepo.existsMeBlockedTarget(meId, targetId)) {
+            throw new BusinessException(ErrorCode.BLOCK_ALREADY_EXISTS);
+        }
+    }
+
 
     public record AvailabilityResponse(Boolean usernameAvailable, Boolean emailAvailable) {
     }
