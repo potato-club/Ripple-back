@@ -55,6 +55,6 @@ public class FeedMapper {
                 feed.getVisibility(),
                 feed.getCreatedAt(),
                 feed.getUpdatedAt()
-                );
+        );
     }
 }

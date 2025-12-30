@@ -6,7 +6,6 @@ import lombok.RequiredArgsConstructor;
 import org.example.rippleback.core.error.BusinessException;
 import org.example.rippleback.core.error.ErrorCode;
 import org.example.rippleback.features.feed.app.FeedService;
-import org.example.rippleback.features.feed.domain.Feed;
 import org.example.rippleback.features.feed.domain.FeedStatus;
 import org.example.rippleback.features.feed.infra.FeedBookmarkRepository;
 import org.example.rippleback.features.feed.infra.FeedLikeRepository;
@@ -200,10 +199,9 @@ public class UserService {
                         img.height(),
                         img.sizeBytes()
                 );
-                mediaRepo.save(media);
+                Media saved = mediaRepo.saveAndFlush(media);
 
-                me.updateProfileImage(media.getId());
-
+                me.updateProfileImage(saved.getId());
                 em.flush();
                 em.refresh(me);
             }
@@ -370,7 +368,7 @@ public class UserService {
         User u = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        if(u.getStatus() != UserStatus.ACTIVE) throw new BusinessException(ErrorCode.USER_INACTIVE);
+        if (u.getStatus() != UserStatus.ACTIVE) throw new BusinessException(ErrorCode.USER_INACTIVE);
         return u;
     }
 

@@ -3,35 +3,35 @@ package org.example.rippleback.features.media.domain;
 import jakarta.persistence.*;
 import lombok.*;
 import org.example.rippleback.features.media.validation.S3ObjectKey;
+import org.hibernate.annotations.Check;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.Instant;
-import org.hibernate.annotations.Check;
 
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder(toBuilder = true)
 @Check(constraints = """
-    (
-      media_type IN ('PROFILE_IMAGE', 'FEED_IMAGE')
-      AND object_key IS NOT NULL
-      AND video_prefix IS NULL
-      AND duration_sec IS NULL
-    )
-    OR
-    (
-      media_type = 'FEED_VIDEO'
-      AND video_prefix IS NOT NULL
-      AND object_key IS NULL
-      AND duration_sec BETWEEN 3 AND 180
-    )
-    """)
+        (
+          media_type IN ('PROFILE_IMAGE', 'FEED_IMAGE')
+          AND object_key IS NOT NULL
+          AND video_prefix IS NULL
+          AND duration_sec IS NULL
+        )
+        OR
+        (
+          media_type = 'FEED_VIDEO'
+          AND video_prefix IS NOT NULL
+          AND object_key IS NULL
+          AND duration_sec BETWEEN 3 AND 180
+        )
+        """)
 @Entity
 @Table(
         name = "media",
         indexes = {
-                @Index(name = "ix_media_owner", columnList = "owner_id, id DESC")
+                @Index(name = "ix_media_owner", columnList = "ownerId, id DESC")
         }
 )
 public class Media {
@@ -40,7 +40,9 @@ public class Media {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "owner_id", nullable = false)
+    // 이 미디어를 소유하고 있는 유저의 ID
+    // Feed 와의 연결은 FeedMedia 를 통해서 관리
+    @Column(name = "ownerId", nullable = false)
     private Long ownerId;
 
     @Enumerated(EnumType.STRING)
@@ -144,7 +146,7 @@ public class Media {
     }
 
     public static Media newFeedImage(
-            Long feedId,
+            Long userId,
             String objectKey,
             String mimeType,
             Integer width,
@@ -152,7 +154,7 @@ public class Media {
             Long sizeBytes
     ) {
         return Media.builder()
-                .ownerId(feedId)
+                .ownerId(userId)
                 .mediaType(MediaType.FEED_IMAGE)
                 .objectKey(objectKey)
                 .mimeType(mimeType)
@@ -164,7 +166,7 @@ public class Media {
     }
 
     public static Media newFeedVideo(
-            Long feedId,
+            Long userId,
             String videoPrefix,
             String mimeType,
             Integer width,
@@ -173,7 +175,7 @@ public class Media {
             Long sizeBytes
     ) {
         return Media.builder()
-                .ownerId(feedId)
+                .ownerId(userId)
                 .mediaType(MediaType.FEED_VIDEO)
                 .videoPrefix(videoPrefix)
                 .mimeType(mimeType)
