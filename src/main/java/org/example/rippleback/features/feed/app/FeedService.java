@@ -9,7 +9,6 @@ import org.example.rippleback.features.feed.domain.*;
 import org.example.rippleback.features.feed.infra.*;
 import org.example.rippleback.features.media.app.MediaUrlResolver;
 import org.example.rippleback.features.media.domain.Media;
-import org.example.rippleback.features.media.domain.MediaStatus;
 import org.example.rippleback.features.media.domain.MediaType;
 import org.example.rippleback.features.media.infra.MediaRepository;
 import org.example.rippleback.features.user.domain.User;
@@ -39,6 +38,11 @@ public class FeedService {
     private static final long MAX_FEED_IMAGE_BYTES = 5 * 1024 * 1024L; // 5MB
     private static final Duration FEED_IMAGE_PRESIGN_TTL = Duration.ofMinutes(10);
 
+    private static final long MAX_FEED_VIDEO_BYTES = 200 * 1024 * 1024L; // 200MB
+    private static final Duration FEED_VIDEO_PRESIGN_TTL = Duration.ofMinutes(20);
+    private static final int MIN_FEED_VIDEO_DURATION_SEC = 3;
+    private static final int MAX_FEED_VIDEO_DURATION_SEC = 180;
+
     private final FeedRepository feedRepository;
     private final FeedLikeRepository feedLikeRepository;
     private final FeedBookmarkRepository feedBookmarkRepository;
@@ -58,11 +62,11 @@ public class FeedService {
     private final Clock clock;
     private final EntityManager em;
 
-    @Value("${media.bucket}")
+    @Value("${app.media.bucket}")
     private String mediaBucket;
 
     /**
-     * [NEW] 피드 이미지 업로드용 presigned PUT URL 발급 (최대 15장)
+     * 피드 이미지 업로드용 presigned PUT URL 발급 (최대 15장)
      * - 프론트는 uploadUrl로 S3에 직접 PUT 업로드
      * - 업로드 후 objectKey 리스트를 createFeed에 전달
      */
@@ -82,7 +86,6 @@ public class FeedService {
 
             long size = (f.sizeBytes() == null) ? -1L : f.sizeBytes();
             if (size <= 0 || size > MAX_FEED_IMAGE_BYTES) {
-                // 프로젝트에 맞는 에러코드가 있으면 교체하세요 (예: MEDIA_SIZE_EXCEEDED)
                 throw new BusinessException(ErrorCode.INVALID_MEDIA_TYPE);
             }
 
@@ -92,7 +95,7 @@ public class FeedService {
             }
 
             String objectKey = buildFeedImageKey(userId, ext);
-            String uploadUrl = createPresignedPutUrl(objectKey, f.mimeType());
+            String uploadUrl = createPresignedPutUrl(objectKey, f.mimeType(), FEED_IMAGE_PRESIGN_TTL);
 
             items.add(new FeedImagePresignResponseDto.Item(
                     uploadUrl,
@@ -105,55 +108,157 @@ public class FeedService {
     }
 
     /**
-     * [CHANGED] 피드 생성 (이미지형)
-     * - request.imageObjectKeys(업로드 완료된 objectKey들) 기반
-     * - Media 먼저 생성(FEED_IMAGE) -> 첫 Media.id를 thumbnailMediaId로 사용
-     * - Feed 생성 -> FeedMedia 연결 생성(sortOrder)
+     * 피드 비디오 업로드용 presigned PUT URL 발급 (비디오 1개 + 썸네일 1개)
+     * - 비디오는 prefix 아래에 보관
+     * ex) users/{userId}/feeds/videos/{token}/source.mp4
+     * users/{userId}/feeds/videos/{token}/thumb.jpg
      */
-    public FeedResponseDto createFeed(Long userId, FeedRequestDto request) {
-
-        // 1) tagsNorm 미리 생성 (Feed는 생성 후 수정 불가 정책)
-        String[] tagsNormArr = normalizeTags(request.tags());
-
-        // 2) 이미지 objectKey 리스트 확보 + 검증(최대 15장, 본인 prefix 강제, 확장자 검증)
-        List<String> keys = request.imageObjectKeys() == null ? List.of() : request.imageObjectKeys();
-        if (keys.isEmpty()) {
+    @Transactional(readOnly = true)
+    public FeedVideoPresignResponseDto prepareFeedVideoUploads(Long userId, FeedVideoPresignRequestDto request) {
+        if (request == null || request.video() == null || request.thumbnail() == null) {
             throw new BusinessException(ErrorCode.INVALID_MEDIA_TYPE);
         }
-        if (keys.size() > MAX_FEED_IMAGES) {
+
+        FeedVideoPresignRequestDto.VideoSpec v = request.video();
+        FeedVideoPresignRequestDto.ThumbnailSpec t = request.thumbnail();
+
+        long vSize = (v.sizeBytes() == null) ? -1L : v.sizeBytes();
+        if (vSize <= 0 || vSize > MAX_FEED_VIDEO_BYTES) {
+            throw new BusinessException(ErrorCode.INVALID_MEDIA_TYPE);
+        }
+
+        Integer dur = v.durationSec();
+        if (dur == null || dur < MIN_FEED_VIDEO_DURATION_SEC || dur > MAX_FEED_VIDEO_DURATION_SEC) {
+            throw new BusinessException(ErrorCode.INVALID_MEDIA_TYPE);
+        }
+
+        String vExt = mapVideoExtFromMime(v.mimeType());
+        if (vExt == null) {
+            throw new BusinessException(ErrorCode.INVALID_MEDIA_TYPE);
+        }
+
+        long tSize = (t.sizeBytes() == null) ? -1L : t.sizeBytes();
+        if (tSize <= 0 || tSize > MAX_FEED_IMAGE_BYTES) {
+            throw new BusinessException(ErrorCode.INVALID_MEDIA_TYPE);
+        }
+
+        String tExt = mapImageExtFromMime(t.mimeType());
+        if (tExt == null) {
+            throw new BusinessException(ErrorCode.INVALID_MEDIA_TYPE);
+        }
+
+        String prefix = buildFeedVideoPrefix(userId);
+        String videoObjectKey = prefix + "/source." + vExt;
+        String thumbnailObjectKey = prefix + "/thumb." + tExt;
+
+        String videoUploadUrl = createPresignedPutUrl(videoObjectKey, v.mimeType(), FEED_VIDEO_PRESIGN_TTL);
+        String thumbnailUploadUrl = createPresignedPutUrl(thumbnailObjectKey, t.mimeType(), FEED_IMAGE_PRESIGN_TTL);
+
+        return new FeedVideoPresignResponseDto(
+                prefix,
+                videoObjectKey,
+                videoUploadUrl,
+                thumbnailObjectKey,
+                thumbnailUploadUrl,
+                MAX_FEED_VIDEO_BYTES,
+                MAX_FEED_IMAGE_BYTES,
+                MIN_FEED_VIDEO_DURATION_SEC,
+                MAX_FEED_VIDEO_DURATION_SEC
+        );
+    }
+
+    /**
+     * 피드 생성
+     * - 이미지형: request.imageObjectKeys 사용 (최대 15장)
+     * - 비디오형: request.video 사용 (비디오 1개 + 썸네일 1개)
+     * <p>
+     * 정책:
+     * - 피드는 이미지와 비디오를 동시에 가질 수 없음(XOR)
+     * - 비디오는 1개만 가능
+     * - 썸네일: 이미지형은 첫 이미지, 비디오형은 썸네일 이미지
+     * <p>
+     * Media.ownerId는 항상 userId로 저장 (Feed와의 연결은 FeedMedia가 담당)
+     */
+    public FeedResponseDto createFeed(Long userId, FeedRequestDto request) {
+        String[] tagsNormArr = normalizeTags(request.tags());
+
+        List<FeedRequestDto.FeedImagePatch> imagesRaw = (request.images() == null)
+                ? List.of()
+                : request.images();
+
+        FeedRequestDto.FeedVideoPatch  video = request.video();
+
+        boolean hasImages = !imagesRaw.isEmpty();
+        boolean hasVideo = video != null && video.videoPrefix() != null && !video.videoPrefix().isBlank();
+
+        // XOR 강제: 둘 다 있거나 둘 다 없으면 거부
+        if (hasImages == hasVideo) {
+            throw new BusinessException(ErrorCode.INVALID_MEDIA_TYPE);
+        }
+
+        if (hasImages) {
+            return createImageFeed(userId, request, tagsNormArr, imagesRaw);
+        }
+        return createVideoFeed(userId, request, tagsNormArr, video);
+    }
+
+    private FeedResponseDto createImageFeed(Long userId, FeedRequestDto request, String[] tagsNormArr, List<FeedRequestDto.FeedImagePatch> imagesRaw) {
+        if (imagesRaw.size() > MAX_FEED_IMAGES) {
             throw new BusinessException(ErrorCode.INVALID_MEDIA_TYPE);
         }
 
         String expectedPrefix = "users/" + userId + "/feeds/images/";
-        for (String k : keys) {
-            if (k == null || k.isBlank()) {
+
+        // normalize + 중복 방지
+        Set<String> seen = new HashSet<>();
+        List<FeedRequestDto.FeedImagePatch> images = new ArrayList<>(imagesRaw.size());
+
+        for (FeedRequestDto.FeedImagePatch img : imagesRaw) {
+            if (img == null || img.objectKey() == null || img.objectKey().isBlank()) {
                 throw new BusinessException(ErrorCode.INVALID_MEDIA_TYPE);
             }
-            String key = k.trim();
+
+            String key = img.objectKey().trim();
+
             if (!key.startsWith(expectedPrefix)) {
-                // 프로젝트에 맞는 에러코드가 있으면 교체하세요 (예: INVALID_OBJECT_KEY)
                 throw new BusinessException(ErrorCode.INVALID_MEDIA_TYPE);
             }
             if (!hasAllowedImageExt(key)) {
                 throw new BusinessException(ErrorCode.INVALID_MEDIA_TYPE);
             }
+            if (!seen.add(key)) {
+                throw new BusinessException(ErrorCode.INVALID_MEDIA_TYPE);
+            }
+
+            // 메타데이터는 있으면 사용, 없으면 null 저장
+            String mimeType = (img.mimeType() == null || img.mimeType().isBlank()) ? null : img.mimeType().trim();
+
+            images.add(new FeedRequestDto.FeedImagePatch(
+                    key,
+                    mimeType,
+                    img.width(),
+                    img.height(),
+                    img.sizeBytes()
+            ));
         }
 
-        // 3) Media 먼저 생성 (ownerId는 userId로 통일)
-        List<Media> medias = new ArrayList<>(keys.size());
-        for (String key : keys) {
-            medias.add(Media.builder()
-                    .ownerId(userId)
-                    .mediaType(MediaType.FEED_IMAGE)
-                    .objectKey(key.trim())
-                    .mediaStatus(MediaStatus.READY)
-                    .build());
+        // 1) Media 생성 (ownerId=userId 고정)
+        List<Media> medias = new ArrayList<>(images.size());
+        for (FeedRequestDto.FeedImagePatch img : images) {
+            medias.add(Media.newFeedImage(
+                    userId,
+                    img.objectKey(),
+                    img.mimeType(),
+                    img.width(),
+                    img.height(),
+                    img.sizeBytes()
+            ));
         }
         medias = mediaRepository.saveAll(medias);
 
         Long thumbnailMediaId = medias.getFirst().getId(); // 첫 이미지 = 썸네일
 
-        // 4) Feed 생성
+        // 2) Feed 생성
         Feed feed = Feed.builder()
                 .authorId(userId)
                 .content(request.content())
@@ -162,25 +267,133 @@ public class FeedService {
                 .thumbnailMediaId(thumbnailMediaId)
                 .status(FeedStatus.PUBLISHED)
                 .build();
-
         feedRepository.save(feed);
 
-        // 5) FeedMedia 연결 저장(sortOrder 유지)
+        // 3) FeedMedia 연결(sortOrder)
         List<FeedMedia> links = new ArrayList<>(medias.size());
         for (int i = 0; i < medias.size(); i++) {
             links.add(FeedMedia.create(feed, medias.get(i).getId(), i));
         }
         feedMediaRepository.saveAll(links);
 
-        // 6) 태그 엔티티/관계 저장(기존 유지)
+        // 4) 태그 관계 저장(기존 유지)
         saveTagRelations(feed.getId(), request.tags());
 
-        // 7) 응답 매핑에 필요한 연관(author/thumbnailMedia) 프록시 부착
+        // 5) 썸네일 무결성 체크(선택 정책: 첫 이미지 = 썸네일)
+        em.flush();
+
+        em.refresh(feed);
+        return feedMapper.toResponse(feed, mediaUrlResolver);
+    }
+
+    private FeedResponseDto createVideoFeed(
+            Long userId,
+            FeedRequestDto request,
+            String[] tagsNormArr,
+            FeedRequestDto.FeedVideoPatch video
+    ) {
+        if (video == null) {
+            throw new BusinessException(ErrorCode.INVALID_MEDIA_TYPE);
+        }
+
+        // videoPrefix는 @S3ObjectKey(allowPrefix=true)로 "형식" 검증된다는 전제
+        String prefix = normalizePrefix(video.videoPrefix());
+
+        // 도메인 규칙(유저별/기능별 경로 규칙)은 서비스에서 추가 검증
+        String expectedBase = "users/" + userId + "/feeds/videos/";
+        if (prefix == null || !prefix.startsWith(expectedBase)) {
+            throw new BusinessException(ErrorCode.INVALID_MEDIA_TYPE);
+        }
+
+        // duration
+        Integer dur = video.durationSec();
+        if (dur == null || dur < MIN_FEED_VIDEO_DURATION_SEC || dur > MAX_FEED_VIDEO_DURATION_SEC) {
+            throw new BusinessException(ErrorCode.INVALID_MEDIA_TYPE);
+        }
+
+        // size
+        long vSize = (video.sizeBytes() == null) ? -1L : video.sizeBytes();
+        if (vSize <= 0 || vSize > MAX_FEED_VIDEO_BYTES) {
+            throw new BusinessException(ErrorCode.INVALID_MEDIA_TYPE);
+        }
+
+        // mime / ext 정책(현재 mp4만 허용)
+        String videoMime = (video.mimeType() == null) ? null : video.mimeType().trim();
+        String vExt = mapVideoExtFromMime(videoMime);
+        if (vExt == null) {
+            throw new BusinessException(ErrorCode.INVALID_MEDIA_TYPE);
+        }
+
+        // thumbnail (FeedImagePatch 재사용)
+        FeedRequestDto.FeedImagePatch thumb = video.thumbnail();
+        if (thumb == null) {
+            throw new BusinessException(ErrorCode.INVALID_MEDIA_TYPE);
+        }
+
+        String thumbKey = (thumb.objectKey() == null) ? null : thumb.objectKey().trim();
+        if (thumbKey == null || thumbKey.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_MEDIA_TYPE);
+        }
+
+        // prefix 하위 + 이미지 확장자 + (권장) thumb.* 규칙
+        if (!thumbKey.startsWith(prefix + "/")) {
+            throw new BusinessException(ErrorCode.INVALID_MEDIA_TYPE);
+        }
+        if (!hasAllowedImageExt(thumbKey)) {
+            throw new BusinessException(ErrorCode.INVALID_MEDIA_TYPE);
+        }
+        if (!thumbKey.startsWith(prefix + "/thumb.")) {
+            throw new BusinessException(ErrorCode.INVALID_MEDIA_TYPE);
+        }
+
+        String thumbMime = (thumb.mimeType() == null) ? null : thumb.mimeType().trim();
+
+        // 1) Media 생성/저장
+        Media videoMedia = Media.newFeedVideo(
+                userId,
+                prefix,
+                videoMime,
+                video.width(),
+                video.height(),
+                dur,
+                vSize
+        );
+
+        Media thumbnailMedia = Media.newFeedImage(
+                userId,
+                thumbKey,
+                thumbMime,
+                thumb.width(),
+                thumb.height(),
+                thumb.sizeBytes()
+        );
+
+        videoMedia = mediaRepository.save(videoMedia);
+        thumbnailMedia = mediaRepository.save(thumbnailMedia);
+
+        // 2) Feed 생성 (thumbnailMediaId는 썸네일)
+        Feed feed = Feed.builder()
+                .authorId(userId)
+                .content(request.content())
+                .tagsNorm(tagsNormArr)
+                .visibility(request.visibility() == null ? FeedVisibility.PUBLIC : request.visibility())
+                .thumbnailMediaId(thumbnailMedia.getId())
+                .status(FeedStatus.PUBLISHED)
+                .build();
+        feedRepository.save(feed);
+
+        // 3) FeedMedia 연결: 비디오만(1개)
+        feedMediaRepository.save(FeedMedia.create(feed, videoMedia.getId(), 0));
+
+        // 4) 태그 관계 저장
+        saveTagRelations(feed.getId(), request.tags());
+
         em.flush();
         em.refresh(feed);
 
         return feedMapper.toResponse(feed, mediaUrlResolver);
     }
+
 
     /**
      * 피드는 생성 후 수정 불가 정책.
@@ -264,7 +477,7 @@ public class FeedService {
      * FullView:
      * - MediaType으로 이미지/비디오 분기
      * - 첫 조회일 때만 크레딧 차감 + 히스토리 저장
-     *
+     * <p>
      * NOTE: Controller에서 호출 시 파라미터 순서가 (feedId, userId)로 뒤집혀 있던 부분은
      * 반드시 feedService.getFeedFullView(principal.userId(), feedId)로 고쳐야 합니다.
      */
@@ -493,6 +706,14 @@ public class FeedService {
         };
     }
 
+    private String mapVideoExtFromMime(String mime) {
+        if (mime == null) return null;
+        return switch (mime.toLowerCase(Locale.ROOT)) {
+            case "video/mp4" -> "mp4";
+            default -> null;
+        };
+    }
+
     private boolean hasAllowedImageExt(String key) {
         String lower = key.toLowerCase(Locale.ROOT);
         return lower.endsWith(".jpg")
@@ -508,7 +729,22 @@ public class FeedService {
         return "users/%d/feeds/images/%d_%s.%s".formatted(userId, now, uuid, ext);
     }
 
-    private String createPresignedPutUrl(String objectKey, String mimeType) {
+    private String buildFeedVideoPrefix(Long userId) {
+        long now = Instant.now(clock).toEpochMilli();
+        String uuid = UUID.randomUUID().toString().replace("-", "");
+        return "users/%d/feeds/videos/%d_%s".formatted(userId, now, uuid);
+    }
+
+    private String normalizePrefix(String prefix) {
+        if (prefix == null) return null;
+        String p = prefix.trim();
+        while (p.endsWith("/")) {
+            p = p.substring(0, p.length() - 1);
+        }
+        return p;
+    }
+
+    private String createPresignedPutUrl(String objectKey, String mimeType, Duration ttl) {
         PutObjectRequest por = PutObjectRequest.builder()
                 .bucket(mediaBucket)
                 .key(objectKey)
@@ -517,7 +753,7 @@ public class FeedService {
 
         PutObjectPresignRequest presign = PutObjectPresignRequest.builder()
                 .putObjectRequest(por)
-                .signatureDuration(FEED_IMAGE_PRESIGN_TTL)
+                .signatureDuration(ttl)
                 .build();
 
         PresignedPutObjectRequest presigned = s3Presigner.presignPutObject(presign);

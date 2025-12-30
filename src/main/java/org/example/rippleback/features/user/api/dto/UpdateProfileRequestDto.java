@@ -1,10 +1,11 @@
 package org.example.rippleback.features.user.api.dto;
 
+import jakarta.validation.Valid;
 import org.example.rippleback.features.media.validation.S3ObjectKey;
 
 public record UpdateProfileRequestDto(
         String username,
-        ProfileImagePatch profileImage
+        @Valid ProfileImagePatch profileImage
 ) {
     public record ProfileImagePatch(
             Action action,
