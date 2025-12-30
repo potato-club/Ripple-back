@@ -1,10 +1,12 @@
 package org.example.rippleback.features.feed.api;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.rippleback.common.dto.ApiResponse;
 import org.example.rippleback.core.security.jwt.JwtPrincipal;
 import org.example.rippleback.features.feed.api.dto.*;
 import org.example.rippleback.features.feed.app.FeedService;
+import org.example.rippleback.features.user.app.CustomUserDetails;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -21,7 +23,7 @@ public class FeedController {
     @PostMapping
     public FeedResponseDto createFeed(
             @AuthenticationPrincipal JwtPrincipal principal,
-            @RequestBody FeedRequestDto request
+            @Valid @RequestBody FeedRequestDto request
     ) {
         return feedService.createFeed(principal.userId(), request);
     }
@@ -32,6 +34,14 @@ public class FeedController {
             @RequestBody FeedImagePresignRequestDto request
     ) {
         return feedService.prepareFeedImageUploads(principal.userId(), request);
+    }
+
+    @PostMapping("/videos/presign")
+    public FeedVideoPresignResponseDto prepareFeedVideoUploads(
+            @AuthenticationPrincipal JwtPrincipal principal,
+            @RequestBody FeedVideoPresignRequestDto request
+    ) {
+        return feedService.prepareFeedVideoUploads(principal.userId(), request);
     }
 
     @PatchMapping("/{feedId}/visibility")
