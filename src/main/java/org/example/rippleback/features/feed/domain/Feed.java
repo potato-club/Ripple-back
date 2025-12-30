@@ -2,6 +2,7 @@ package org.example.rippleback.features.feed.domain;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.example.rippleback.features.media.domain.Media;
 import org.example.rippleback.features.user.domain.User;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -26,28 +27,24 @@ public class Feed {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "author_id", nullable = false)
+    @Column(name = "author_id", nullable = false, updatable = false)
     private Long authorId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id", insertable = false, updatable = false)
     private User author;
 
-    @Column(columnDefinition = "text")
+    @Column(columnDefinition = "text", updatable = false)
     private String content;
 
     @JdbcTypeCode(SqlTypes.ARRAY)
-    @Column(name = "tags_norm", columnDefinition = "text[]", nullable = false)
+    @Column(name = "tags_norm", columnDefinition = "text[]", nullable = false, updatable = false)
     @Builder.Default
     private String[] tagsNorm = new String[0];
 
-    @Column(name = "created_at", columnDefinition = "TIMESTAMPTZ", nullable = false)
+    @Column(name = "created_at", columnDefinition = "TIMESTAMPTZ", nullable = false, updatable = false)
     @Builder.Default
     private Instant createdAt = Instant.now();
-
-    @Column(name = "updated_at", columnDefinition = "TIMESTAMPTZ", nullable = false)
-    @Builder.Default
-    private Instant updatedAt = Instant.now();
 
     @Column(name = "deleted_at", columnDefinition = "TIMESTAMPTZ")
     private Instant deletedAt;
@@ -64,16 +61,25 @@ public class Feed {
     @Column(name = "view_count", nullable = false)
     private int viewCount = 0;
 
-    @Column(name = "feed_thumbnail")
-    private String thumbnail;
+    @Column(name = "thumbnail_media_id")
+    private Long thumbnailMediaId;
 
-    @ElementCollection(fetch = FetchType.LAZY)
-    @CollectionTable(name = "feed_media_keys", joinColumns = @JoinColumn(name = "feed_id"))
-    @Column(name = "media_key")
-    private List<String> mediaKeys;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "thumbnail_media_id", insertable = false, updatable = false)
+    private Media thumbnailMedia;
+
+    @OneToMany(mappedBy = "feed", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sortOrder ASC")
+    @Builder.Default
+    @Getter(AccessLevel.NONE)
+    private List<FeedMedia> feedMedias = new ArrayList<>();
+
+    public List<FeedMedia> getFeedMedias() {
+        return List.copyOf(feedMedias);
+    }
 
     @Enumerated(EnumType.STRING)
-    @Column(length = 16, nullable = false)
+    @Column(length = 16, nullable = false, updatable = false)
     @Builder.Default
     private FeedVisibility visibility = FeedVisibility.PUBLIC;
 
@@ -84,33 +90,24 @@ public class Feed {
 
     @PrePersist
     public void onCreate() {
-        if (this.createdAt == null) {
-            this.createdAt = Instant.now();
-        }
-
-        if (this.updatedAt == null) {
-            this.updatedAt = Instant.now();
-        }
-    }
-
-    @PreUpdate
-    public void touchUpdatedAt() {
-        this.updatedAt = Instant.now();
+        if (this.createdAt == null) this.createdAt = Instant.now();
     }
 
     public void softDelete() {
+        if (this.status == FeedStatus.DELETED) return;
         this.status = FeedStatus.DELETED;
         this.deletedAt = Instant.now();
-        touchUpdatedAt();
+    }
+
+    public void updateThumbnailMediaId(Long thumbnailMediaId) {
+        this.thumbnailMediaId = thumbnailMediaId;
     }
 
     public void updateVisibility(FeedVisibility visibility) {
         this.visibility = visibility;
-        touchUpdatedAt();
     }
 
     public void updateTagsNorm(List<String> tags) {
         this.tagsNorm = tags.toArray(String[]::new);
     }
-
 }

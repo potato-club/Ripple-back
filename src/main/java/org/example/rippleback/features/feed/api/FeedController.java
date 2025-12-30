@@ -26,6 +26,14 @@ public class FeedController {
         return feedService.createFeed(principal.userId(), request);
     }
 
+    @PostMapping("/images/presign")
+    public FeedImagePresignResponseDto presignFeedImages(
+            @AuthenticationPrincipal JwtPrincipal principal,
+            @RequestBody FeedImagePresignRequestDto request
+    ) {
+        return feedService.prepareFeedImageUploads(principal.userId(), request);
+    }
+
     @PatchMapping("/{feedId}/visibility")
     public ApiResponse<Void> changeVisibility(
             @AuthenticationPrincipal JwtPrincipal principal,
@@ -73,7 +81,7 @@ public class FeedController {
             @AuthenticationPrincipal JwtPrincipal principal,
             @PathVariable Long feedId
     ){
-        return ResponseEntity.ok(feedService.getFeedFullView(feedId, principal.userId()));
+        return ResponseEntity.ok(feedService.getFeedFullView(principal.userId(), feedId));
     }
 
     @PostMapping("/{feedId}/report")
