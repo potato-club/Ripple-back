@@ -62,7 +62,7 @@ public class FeedService {
     private final Clock clock;
     private final EntityManager em;
 
-    @Value("${app.media.bucket}")
+    @Value("${media.bucket}")
     private String mediaBucket;
 
     /**
