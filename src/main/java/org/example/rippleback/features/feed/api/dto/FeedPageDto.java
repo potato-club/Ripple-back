@@ -5,7 +5,7 @@ import java.util.List;
 public record FeedPageDto(
         List<FeedResponseDto> feeds,
         Long nextCursor,
-        boolean hasNest
+        boolean hasNext
 
 ) {
 }
