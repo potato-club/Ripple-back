@@ -179,6 +179,7 @@ public class FeedService {
      * <p>
      * Media.ownerId는 항상 userId로 저장 (Feed와의 연결은 FeedMedia가 담당)
      */
+    @Transactional(readOnly = false)
     public FeedResponseDto createFeed(Long userId, FeedRequestDto request) {
         String[] tagsNormArr = normalizeTags(request.tags());
 
