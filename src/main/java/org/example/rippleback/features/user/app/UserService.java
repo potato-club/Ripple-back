@@ -99,7 +99,7 @@ public class UserService {
         long followersCount = userFollowRepo.countByFollowingId(meId);
         long followingsCount = userFollowRepo.countByFollowerId(meId);
 
-        var latestFeeds = feedService.getLatestByAuthor(meId);
+        var latestFeeds = feedService.getLatestByAuthor(meId, meId);
 
         return userMapper.toMe(u, postsCount, followersCount, followingsCount, latestFeeds);
     }
@@ -117,7 +117,7 @@ public class UserService {
         long followersCount = userFollowRepo.countByFollowingId(id);
         long followingsCount = userFollowRepo.countByFollowerId(id);
 
-        var latestFeeds = feedService.getLatestByAuthor(id);
+        var latestFeeds = feedService.getLatestByAuthor(viewerId, id);
 
         return userMapper.toProfile(u, isFollow, feedsCount, followersCount, followingsCount, latestFeeds);
     }
@@ -138,7 +138,7 @@ public class UserService {
         long followersCount = userFollowRepo.countByFollowingId(id);
         long followingsCount = userFollowRepo.countByFollowerId(id);
 
-        var latestFeeds = feedService.getLatestByAuthor(id);
+        var latestFeeds = feedService.getLatestByAuthor(viewerId, id);
 
         return userMapper.toProfile(u, isFollow, feedsCount, followersCount, followingsCount, latestFeeds);
     }
@@ -260,7 +260,7 @@ public class UserService {
         long posts = feedRepo.countByAuthorIdAndStatus(meId, FeedStatus.PUBLISHED);
         long followers = userFollowRepo.countByFollowingId(meId);
         long followings = userFollowRepo.countByFollowerId(meId);
-        var latestFeeds = feedService.getLatestByAuthor(meId);
+        var latestFeeds = feedService.getLatestByAuthor(meId, meId);
 
         return userMapper.toMe(me, posts, followers, followings, latestFeeds);
     }
