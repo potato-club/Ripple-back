@@ -13,9 +13,10 @@ import org.example.rippleback.features.feed.domain.Feed;
 import org.example.rippleback.features.feed.domain.FeedStatus;
 import org.example.rippleback.features.feed.domain.FeedVisibility;
 import org.example.rippleback.features.feed.infra.FeedRepository;
-import org.example.rippleback.features.user.api.dto.UserSummaryDto;
+import org.example.rippleback.features.user.api.dto.UserProfileSummaryResponseDto;
 import org.example.rippleback.features.user.app.UserMapper;
 import org.example.rippleback.features.user.domain.User;
+import org.example.rippleback.features.user.infra.UserFollowRepository;
 import org.example.rippleback.features.user.infra.UserRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -33,6 +34,7 @@ import java.util.stream.Collectors;
 public class CommentService {
 
     private final UserRepository userRepo;
+    private final UserFollowRepository userFollowRepo;
     private final CommentRepository commentRepo;
     private final CommentLikeRepository commentLikeRepo;
     private final CommentReportRepository commentReportRepo;
@@ -87,7 +89,8 @@ public class CommentService {
 
         User author = userRepo.findById(authorId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-        UserSummaryDto authorSummary = userMapper.toSummary(author);
+
+        UserProfileSummaryResponseDto authorSummary = userMapper.toSummary(author, false);
 
         return CommentResponseDto.from(saved, authorSummary);
     }
@@ -216,6 +219,7 @@ public class CommentService {
     ) {
         Feed feed = feedRepo.findById(feedId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FEED_NOT_FOUND));
+
         assertFeedVisibleToMeOr404(feed, viewerId);
 
         int pageSize = Math.max(1, size);
@@ -223,12 +227,11 @@ public class CommentService {
 
         List<Comment> comments;
 
-        if (sortType == CommentSortType.LATEST) {
-            comments = commentRepo.findRootComments(feedId, cursorId, pageable);
-        } else if (sortType == CommentSortType.MOST_LIKED) {
+        if (sortType == CommentSortType.MOST_LIKED) {
             comments = commentRepo.findRootCommentsOrderByLikeCountDesc(feedId, pageable);
             cursorId = null;
         } else {
+            // 기본/최신순
             comments = commentRepo.findRootComments(feedId, cursorId, pageable);
         }
 
@@ -244,15 +247,31 @@ public class CommentService {
                 ? List.of()
                 : userRepo.findByIdInWithProfile(authorIds);
 
-        Map<Long, UserSummaryDto> authorMap = users.stream()
-                .map(userMapper::toSummary)
-                .collect(Collectors.toMap(UserSummaryDto::id, it -> it));
+        Set<Long> followingIds = (viewerId == null || authorIds.isEmpty())
+                ? Set.of()
+                : userFollowRepo.findFollowingIdsIn(viewerId, authorIds);
+
+        Map<Long, UserProfileSummaryResponseDto> authorMap = users.stream()
+                .collect(Collectors.toMap(
+                        User::getId,
+                        u -> {
+                            boolean following = viewerId != null
+                                    && !u.getId().equals(viewerId)
+                                    && followingIds.contains(u.getId());
+                            return userMapper.toSummary(u, following);
+                        }
+                ));
 
         List<CommentResponseDto> dtos = comments.stream()
                 .map(c -> {
-                    UserSummaryDto author = authorMap.get(c.getAuthorId());
+                    UserProfileSummaryResponseDto author = authorMap.get(c.getAuthorId());
                     if (author == null) {
-                        author = new UserSummaryDto(c.getAuthorId(), "Ripple User", null);
+                        author = new UserProfileSummaryResponseDto(
+                                c.getAuthorId(),
+                                "Ripple User",
+                                null,
+                                false
+                        );
                     }
                     return CommentResponseDto.from(c, author);
                 })
@@ -316,15 +335,31 @@ public class CommentService {
                 ? List.of()
                 : userRepo.findByIdInWithProfile(authorIds);
 
-        Map<Long, UserSummaryDto> authorMap = users.stream()
-                .map(userMapper::toSummary)
-                .collect(Collectors.toMap(UserSummaryDto::id, it -> it));
+        Set<Long> followingIds = (viewerId == null || authorIds.isEmpty())
+                ? Set.of()
+                : userFollowRepo.findFollowingIdsIn(viewerId, authorIds);
+
+        Map<Long, UserProfileSummaryResponseDto> authorMap = users.stream()
+                .collect(Collectors.toMap(
+                        User::getId,
+                        u -> {
+                            boolean following = viewerId != null
+                                    && !u.getId().equals(viewerId)
+                                    && followingIds.contains(u.getId());
+                            return userMapper.toSummary(u, following);
+                        }
+                ));
 
         List<CommentResponseDto> dtos = replies.stream()
                 .map(c -> {
-                    UserSummaryDto author = authorMap.get(c.getAuthorId());
+                    UserProfileSummaryResponseDto author = authorMap.get(c.getAuthorId());
                     if (author == null) {
-                        author = new UserSummaryDto(c.getAuthorId(), "Ripple User", null);
+                        author = new UserProfileSummaryResponseDto(
+                                c.getAuthorId(),
+                                "Ripple User",
+                                null,
+                                false
+                        );
                     }
                     return CommentResponseDto.from(c, author);
                 })
@@ -343,23 +378,6 @@ public class CommentService {
         }
 
         return new CommentPageResponseDto(dtos, nextCursor, hasNext);
-    }
-
-    // 유저 프로필 페이지에서 보여줄 댓글 검색할 메서드
-    @Transactional(readOnly = true)
-    public List<CommentResponseDto> getLatestByAuthor(Long authorId, int size) {
-        int limit = Math.max(1, Math.min(size, 50));
-        var page = PageRequest.of(0, limit);
-
-        var comments = commentRepo.findLatestVisiblePublicByAuthorId(authorId, page);
-
-        var author = userRepo.findById(authorId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-        var authorSummary = userMapper.toSummary(author);
-
-        return comments.stream()
-                .map(c -> CommentResponseDto.from(c, authorSummary))
-                .toList();
     }
 
     private void assertFeedVisibleToMeOr404(Feed feed, Long userId) {

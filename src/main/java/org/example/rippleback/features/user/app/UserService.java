@@ -92,48 +92,93 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public MeResponseDto getMe(Long meId) {
-        User u = userRepository.findById(meId).orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-        return userMapper.toMe(u);
+        User u = userRepository.findById(meId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        long postsCount = feedRepo.countByAuthorIdAndStatus(meId, FeedStatus.PUBLISHED);
+        long followersCount = userFollowRepo.countByFollowingId(meId);
+        long followingsCount = userFollowRepo.countByFollowerId(meId);
+
+        var latestFeeds = feedService.getLatestByAuthor(meId);
+
+        return userMapper.toMe(u, postsCount, followersCount, followingsCount, latestFeeds);
     }
 
     @Transactional(readOnly = true)
-    public UserResponseDto getProfileById(Long id) {
+    public UserProfileResponseDto getProfileById(Long id, Long viewerId) {
         User u = userRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         if (u.getStatus() != UserStatus.ACTIVE) throw new BusinessException(ErrorCode.USER_NOT_FOUND);
 
-        long posts = feedRepo.countByAuthorIdAndStatus(id, FeedStatus.PUBLISHED);
-        long followers = userFollowRepo.countByFollowingId(id);
-        long followings = userFollowRepo.countByFollowerId(id);
+        Boolean isFollow = userFollowRepo.existsByFollowerIdAndFollowingId(viewerId, u.getId());
+
+        long feedsCount = feedRepo.countByAuthorIdAndStatus(id, FeedStatus.PUBLISHED);
+        long followersCount = userFollowRepo.countByFollowingId(id);
+        long followingsCount = userFollowRepo.countByFollowerId(id);
 
         var latestFeeds = feedService.getLatestByAuthor(id);
 
-        return userMapper.toProfile(u, posts, followers, followings, latestFeeds);
+        return userMapper.toProfile(u, isFollow, feedsCount, followersCount, followingsCount, latestFeeds);
     }
 
     @Transactional(readOnly = true)
-    public UserResponseDto getProfileByUsername(String username) {
+    public UserProfileResponseDto getProfileByUsername(String username, Long viewerId) {
+
         User u = userRepository.findByUsernameIgnoreCaseAndDeletedAtIsNull(username)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
         if (u.getStatus() != UserStatus.ACTIVE) throw new BusinessException(ErrorCode.USER_NOT_FOUND, "비활성화된 계정입니다.");
 
         long id = u.getId();
-        long posts = feedRepo.countByAuthorIdAndStatus(id, FeedStatus.PUBLISHED);
-        long followers = userFollowRepo.countByFollowingId(id);
-        long followings = userFollowRepo.countByFollowerId(id);
+
+        Boolean isFollow = userFollowRepo.existsByFollowerIdAndFollowingId(viewerId, u.getId());
+
+        long feedsCount = feedRepo.countByAuthorIdAndStatus(id, FeedStatus.PUBLISHED);
+        long followersCount = userFollowRepo.countByFollowingId(id);
+        long followingsCount = userFollowRepo.countByFollowerId(id);
+
         var latestFeeds = feedService.getLatestByAuthor(id);
 
-        return userMapper.toProfile(u, posts, followers, followings, latestFeeds);
+        return userMapper.toProfile(u, isFollow, feedsCount, followersCount, followingsCount, latestFeeds);
     }
 
     @Transactional(readOnly = true)
-    public PageCursorResponse<UserSummaryDto> search(String q, Long cursor, int size) {
+    public PageCursorResponse<UserProfileSummaryResponseDto> search(Long viewerId,
+                                                                    String q,
+                                                                    Long cursor,
+                                                                    int size
+    ) {
         int pageSize = Math.max(1, Math.min(size, 50));
-        List<User> users = userRepository.search(q == null ? "" : q, cursor, PageRequest.of(0, pageSize));
-        String next = users.size() == pageSize ? String.valueOf(users.get(users.size() - 1).getId()) : null;
+
+        List<User> users = userRepository.search(
+                q == null ? "" : q,
+                cursor,
+                PageRequest.of(0, pageSize)
+        );
+
+        String next = users.size() == pageSize
+                ? String.valueOf(users.get(users.size() - 1).getId())
+                : null;
+
         boolean hasNext = next != null;
-        List<UserSummaryDto> items = users.stream().map(userMapper::toSummary).toList();
+
+        // 1) 결과 유저 id 수집
+        var targetIds = users.stream().map(User::getId).collect(java.util.stream.Collectors.toSet());
+
+        // 2) viewerId가 팔로우 중인 id들을 한 번에 조회
+        java.util.Set<Long> followingIds = (viewerId == null || targetIds.isEmpty())
+                ? java.util.Set.of()
+                : userFollowRepo.findFollowingIdsIn(viewerId, targetIds);
+
+        // 3) DTO 매핑 (self면 following=false)
+        List<UserProfileSummaryResponseDto> items = users.stream()
+                .map(u -> userMapper.toSummary(
+                        u,
+                        viewerId != null && !u.getId().equals(viewerId) && followingIds.contains(u.getId())
+                ))
+                .toList();
+
         return new PageCursorResponse<>(items, next, hasNext);
     }
 
@@ -162,7 +207,7 @@ public class UserService {
     }
 
     @Transactional
-    public UserResponseDto updateProfile(Long meId, UpdateProfileRequestDto req) {
+    public MeResponseDto updateProfile(Long meId, UpdateProfileRequestDto req) {
         User me = loadActiveForWrite(meId);
 
         if (req.username() != null) {
@@ -217,7 +262,7 @@ public class UserService {
         long followings = userFollowRepo.countByFollowerId(meId);
         var latestFeeds = feedService.getLatestByAuthor(meId);
 
-        return userMapper.toProfile(me, posts, followers, followings, latestFeeds);
+        return userMapper.toMe(me, posts, followers, followings, latestFeeds);
     }
 
 
@@ -258,7 +303,9 @@ public class UserService {
                 .follower(em.getReference(User.class, meId))
                 .following(em.getReference(User.class, targetId))
                 .build();
+
         userFollowRepo.save(f);
+
         return new FollowResponseDto(meId, targetId, true);
     }
 
@@ -301,7 +348,7 @@ public class UserService {
 
     // 유저의 팔로우 한 목록 조회 (보는 유저가 viewer, 목록 보여주는 유저가 ownerId)
     @Transactional(readOnly = true)
-    public PageCursorResponse<UserSummaryDto> listFollowers(Long viewerId, Long userId, Long cursor, int size) {
+    public PageCursorResponse<UserProfileSummaryResponseDto> listFollowers(Long viewerId, Long userId, Long cursor, int size) {
         // 페이지를 size 받은거 혹은 20 중에 최소값으로 사용
         int pageSize = Math.max(1, Math.min(size, 20));
 
@@ -327,9 +374,24 @@ public class UserService {
                 PageRequest.of(0, pageSize)
         );
 
+        var followerIds = edges.stream()
+                .map(e -> e.getFollower().getId())
+                .collect(java.util.stream.Collectors.toSet());
+
+        java.util.Set<Long> followingIds = (viewerId == null || followerIds.isEmpty())
+                ? java.util.Set.of()
+                : userFollowRepo.findFollowingIdsIn(viewerId, followerIds);
+
         var items = edges.stream()
-                .map(e -> userMapper.toSummary(e.getFollower()))
+                .map(e -> {
+                    var u = e.getFollower();
+                    boolean following = viewerId != null
+                            && !u.getId().equals(viewerId)
+                            && followingIds.contains(u.getId());
+                    return userMapper.toSummary(u, following);
+                })
                 .toList();
+
 
         String next = edges.size() == pageSize
                 ? String.valueOf(edges.get(edges.size() - 1).getId())
@@ -340,7 +402,7 @@ public class UserService {
 
 
     @Transactional(readOnly = true)
-    public PageCursorResponse<UserSummaryDto> listMyBlocks(Long meId, Long cursor, int size) {
+    public PageCursorResponse<UserProfileSummaryResponseDto> listMyBlocks(Long meId, Long cursor, int size) {
         // 내 상태 체크
         loadActiveForWrite(meId);
 
@@ -349,7 +411,7 @@ public class UserService {
 
         var items = edges.stream()
                 .map(UserBlock::getBlocked)
-                .map(userMapper::toSummary)
+                .map(u -> userMapper.toSummary(u, false))
                 .toList();
 
         String next = edges.size() == pageSize

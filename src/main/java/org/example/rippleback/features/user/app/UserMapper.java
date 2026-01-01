@@ -5,8 +5,8 @@ import org.example.rippleback.features.feed.api.dto.FeedResponseDto;
 import org.example.rippleback.features.media.app.MediaUrlResolver;
 import org.example.rippleback.features.user.api.dto.MeResponseDto;
 import org.example.rippleback.features.user.api.dto.SignupResponseDto;
-import org.example.rippleback.features.user.api.dto.UserResponseDto;
-import org.example.rippleback.features.user.api.dto.UserSummaryDto;
+import org.example.rippleback.features.user.api.dto.UserProfileResponseDto;
+import org.example.rippleback.features.user.api.dto.UserProfileSummaryResponseDto;
 import org.example.rippleback.features.user.domain.User;
 import org.example.rippleback.features.user.domain.UserStatus;
 import org.springframework.stereotype.Component;
@@ -23,7 +23,12 @@ public class UserMapper {
     private static final String DEFAULT_PROFILE_KEY = "images/default-profile.png";
 
     // 내 정보 매핑
-    public MeResponseDto toMe(User u) {
+    public MeResponseDto toMe(User u,
+                              long postCnt,
+                              long followerCnt,
+                              long followingCnt,
+                              List<FeedResponseDto> latestFeeds
+    ) {
         return new MeResponseDto(
                 u.getId(),
                 u.getUsername(),
@@ -34,21 +39,28 @@ public class UserMapper {
                 u.getTokenVersion(),
                 u.getLastLoginAt(),
                 u.getCreatedAt(),
-                u.getUpdatedAt()
+                u.getUpdatedAt(),
+                postCnt,
+                followerCnt,
+                followingCnt,
+                latestFeeds
+
         );
     }
 
     // 디테일한 프로필 매핑
-    public UserResponseDto toProfile(User u,
-                                     long postCnt,
-                                     long followerCnt,
-                                     long followingCnt,
-                                     List<FeedResponseDto> latestFeeds
+    public UserProfileResponseDto toProfile(User u,
+                                            Boolean isFollow,
+                                            long postCnt,
+                                            long followerCnt,
+                                            long followingCnt,
+                                            List<FeedResponseDto> latestFeeds
     ) {
-        return new UserResponseDto(
+        return new UserProfileResponseDto(
                 u.getId(),
                 u.getUsername(),
                 profileImageUrlOf(u),
+                isFollow,
                 postCnt,
                 followerCnt,
                 followingCnt,
@@ -57,17 +69,18 @@ public class UserMapper {
     }
 
     // 간소화된 프로필 매핑
-    public UserSummaryDto toSummary(User u) {
+    public UserProfileSummaryResponseDto toSummary(User u, Boolean isFollow) {
         String username = u.getUsername();
 
         if (u.getStatus() == UserStatus.DELETED) {
             username = DELETED_USERNAME;
         }
 
-        return new UserSummaryDto(
+        return new UserProfileSummaryResponseDto(
                 u.getId(),
                 username,
-                profileImageUrlOf(u)
+                profileImageUrlOf(u),
+                isFollow
         );
     }
 

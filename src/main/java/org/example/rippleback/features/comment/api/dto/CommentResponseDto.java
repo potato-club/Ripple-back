@@ -2,13 +2,13 @@ package org.example.rippleback.features.comment.api.dto;
 
 import org.example.rippleback.features.comment.domain.Comment;
 import org.example.rippleback.features.comment.domain.CommentStatus;
-import org.example.rippleback.features.user.api.dto.UserSummaryDto;
+import org.example.rippleback.features.user.api.dto.UserProfileSummaryResponseDto;
 
 import java.time.Instant;
 
 public record CommentResponseDto(
         Long id,
-        UserSummaryDto author,
+        UserProfileSummaryResponseDto author,
         Long rootCommentId,
         Long replyToUserId,
         Long replyToCommentId,
@@ -17,7 +17,7 @@ public record CommentResponseDto(
         boolean deleted,
         Instant createdAt
 ) {
-    public static CommentResponseDto from(Comment c, UserSummaryDto authorSummary) {
+    public static CommentResponseDto from(Comment c, UserProfileSummaryResponseDto authorSummary) {
         String safeContent = c.getStatus() == CommentStatus.DELETED
                 ? "삭제된 상태입니다."
                 : c.getContent();

@@ -90,8 +90,10 @@ public class UserController {
             @ApiResponse(responseCode = "404", description = "사용자 없음/삭제됨 (1005)")
     })
     @GetMapping("/{id}")
-    public ResponseEntity<UserResponseDto> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(userService.getProfileById(id));
+    public ResponseEntity<UserProfileResponseDto> getById(@PathVariable Long id,
+                                                          @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal p
+    ) {
+        return ResponseEntity.ok(userService.getProfileById(id, p.userId()));
     }
 
     @Operation(
@@ -103,8 +105,10 @@ public class UserController {
             @ApiResponse(responseCode = "404", description = "사용자 없음/삭제됨 (1005)")
     })
     @GetMapping("/by-username/{username}")
-    public ResponseEntity<UserResponseDto> getByUsername(@PathVariable String username) {
-        return ResponseEntity.ok(userService.getProfileByUsername(username));
+    public ResponseEntity<UserProfileResponseDto> getByUsername(@PathVariable String username,
+                                                                @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal p
+    ) {
+        return ResponseEntity.ok(userService.getProfileByUsername(username, p.userId()));
     }
 
     @Operation(
@@ -117,12 +121,13 @@ public class UserController {
     )
     @ApiResponse(responseCode = "200", description = "검색 결과 반환")
     @GetMapping
-    public ResponseEntity<PageCursorResponse<UserSummaryDto>> search(
+    public ResponseEntity<PageCursorResponse<UserProfileSummaryResponseDto>> search(
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal p,
             @RequestParam(required = false, defaultValue = "") String query,
             @RequestParam(required = false) Long cursor,
             @RequestParam(required = false, defaultValue = "20") Integer size
     ) {
-        return ResponseEntity.ok(userService.search(query, cursor, size));
+        return ResponseEntity.ok(userService.search(p.userId(), query, cursor, size));
     }
 
     @Operation(
@@ -164,7 +169,7 @@ public class UserController {
             @ApiResponse(responseCode = "400", description = "유효하지 않은 objectKey/중복 username 등 (1601/1000)")
     })
     @PatchMapping("/me/profile")
-    public ResponseEntity<UserResponseDto> updateProfile(
+    public ResponseEntity<MeResponseDto> updateProfile(
             @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal p,
             @Valid @RequestBody UpdateProfileRequestDto req
     ) {
@@ -275,7 +280,7 @@ public class UserController {
     )
     @ApiResponse(responseCode = "200", description = "차단 목록 반환")
     @GetMapping("/me/blocks")
-    public ResponseEntity<PageCursorResponse<UserSummaryDto>> listMyBlocks(
+    public ResponseEntity<PageCursorResponse<UserProfileSummaryResponseDto>> listMyBlocks(
             @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal p,
             @RequestParam(required = false) Long cursor,
             @RequestParam(required = false, defaultValue = "20") Integer size

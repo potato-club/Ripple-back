@@ -4,10 +4,11 @@ import org.example.rippleback.features.feed.api.dto.FeedResponseDto;
 
 import java.util.List;
 
-public record UserResponseDto(
+public record UserProfileResponseDto(
         Long id,
         String username,
         String profileImageUrl,
+        boolean following,
         long postCount,
         long followerCount,
         long followingCount,
