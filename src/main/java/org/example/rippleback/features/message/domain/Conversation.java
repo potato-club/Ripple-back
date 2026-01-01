@@ -29,10 +29,12 @@ public class Conversation {
             joinColumns = @JoinColumn(name = "conversation_id"),
             inverseJoinColumns = @JoinColumn(name = "user_id")
     )
+    @Builder.Default
     private Set<User> participants = new HashSet<>();
 
     @OneToMany(mappedBy = "conversation", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sentAt ASC")
+    @Builder.Default
     private List<Message> messages = new ArrayList<>();
 
     @Column
@@ -47,8 +49,6 @@ public class Conversation {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ConversationType type; // DM, GROUP
-
-
 
     public boolean hasParticipant(User user) {
         return participants.contains(user);

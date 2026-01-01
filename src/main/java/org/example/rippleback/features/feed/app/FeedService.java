@@ -12,7 +12,9 @@ import org.example.rippleback.features.media.domain.Media;
 import org.example.rippleback.features.media.domain.MediaType;
 import org.example.rippleback.features.media.infra.MediaRepository;
 import org.example.rippleback.features.user.domain.User;
+import org.example.rippleback.features.user.domain.UserFollow;
 import org.example.rippleback.features.user.infra.UserBlockRepository;
+import org.example.rippleback.features.user.infra.UserFollowRepository;
 import org.example.rippleback.features.user.infra.UserRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
@@ -49,6 +51,7 @@ public class FeedService {
     private final FeedTagRepository tagRepository;
     private final FeedMapper feedMapper;
     private final MediaUrlResolver mediaUrlResolver;
+    private final UserFollowRepository userFollowRepository;
     private final UserBlockRepository userBlockRepository;
     private final FeedViewHistoryRepository feedViewHistoryRepository;
     private final UserRepository userRepository;
@@ -284,7 +287,7 @@ public class FeedService {
         em.flush();
 
         em.refresh(feed);
-        return feedMapper.toResponse(feed, mediaUrlResolver);
+        return feedMapper.toResponse(feed, mediaUrlResolver, false);
     }
 
     private FeedResponseDto createVideoFeed(
@@ -392,7 +395,7 @@ public class FeedService {
         em.flush();
         em.refresh(feed);
 
-        return feedMapper.toResponse(feed, mediaUrlResolver);
+        return feedMapper.toResponse(feed, mediaUrlResolver, false);
     }
 
 
@@ -438,15 +441,32 @@ public class FeedService {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }
 
-        return feedMapper.toResponse(feed, mediaUrlResolver);
+        boolean following = (viewerId != null)
+                && !authorId.equals(viewerId)
+                && userFollowRepository.existsByFollowerIdAndFollowingId(viewerId, authorId);
+
+        return feedMapper.toResponse(feed, mediaUrlResolver, following);
     }
 
     public List<FeedResponseDto> getUserAllFeeds(Long viewerId) {
         List<Feed> feeds = feedRepository.findAllPublished();
 
-        return feeds.stream()
+        List<Feed> filtered = feeds.stream()
                 .filter(feed -> feedViewHistoryRepository.existsByUserIdAndFeedId(viewerId, feed.getId()))
-                .map(feed -> feedMapper.toResponse(feed, mediaUrlResolver))
+                .toList();
+
+        Set<Long> authorIds = filtered.stream()
+                .map(Feed::getAuthorId)
+                .collect(java.util.stream.Collectors.toSet());
+
+        Set<Long> followingIds = findFollowingIds(viewerId, authorIds);
+
+        return filtered.stream()
+                .map(f -> feedMapper.toResponse(
+                        f,
+                        mediaUrlResolver,
+                        isFollowing(viewerId, f.getAuthorId(), followingIds)
+                ))
                 .toList();
     }
 
@@ -465,9 +485,12 @@ public class FeedService {
 
         Long nextCursor = filtered.isEmpty() ? null : filtered.getLast().getId();
 
+        Set<Long> authorIds = filtered.stream().map(Feed::getAuthorId).collect(java.util.stream.Collectors.toSet());
+        Set<Long> followingIds = findFollowingIds(viewerId, authorIds);
+
         return new FeedPageDto(
                 filtered.stream()
-                        .map(feed -> feedMapper.toResponse(feed, mediaUrlResolver))
+                        .map(f -> feedMapper.toResponse(f, mediaUrlResolver, isFollowing(viewerId, f.getAuthorId(), followingIds)))
                         .toList(),
                 nextCursor,
                 hasNext
@@ -476,14 +499,17 @@ public class FeedService {
 
     // 유저 프로필 페이지에서 가장 최근 제작한 피드 보여주기에 사용하는 메서드 (최소 0, 최대 4)
     @Transactional(readOnly = true)
-    public List<FeedResponseDto> getLatestByAuthor(Long authorId) {
+    public List<FeedResponseDto> getLatestByAuthor(Long viewerId, Long authorId) {
         final int limit = 4; // 프로필 페이지: 최대 4개 고정
         var page = PageRequest.of(0, limit);
 
         var feeds = feedRepository.findLatestPublishedByAuthorId(authorId, page);
 
+        Set<Long> followingIds = findFollowingIds(viewerId, java.util.List.of(authorId));
+        boolean following = isFollowing(viewerId, authorId, followingIds);
+
         return feeds.stream()
-                .map(f -> feedMapper.toResponse(f, mediaUrlResolver))
+                .map(f -> feedMapper.toResponse(f, mediaUrlResolver, following))
                 .toList();
     }
 
@@ -655,19 +681,27 @@ public class FeedService {
                 .toList();
     }
 
-    public List<FeedResponseDto> getFeedsByTag(String tagName) {
+    public List<FeedResponseDto> getFeedsByTag(Long viewerId, String tagName) {
         FeedTag tag = tagRepository.findByName(tagName.toLowerCase().trim())
                 .orElseThrow(() -> new BusinessException(ErrorCode.TAG_NOT_FOUND));
 
         List<Long> feedIds = feedTagRelationRepository.findFeedIdsByTagId(tag.getId());
-        if (feedIds == null || feedIds.isEmpty()) {
-            return List.of();
-        }
+        if (feedIds == null || feedIds.isEmpty()) return List.of();
 
         List<Feed> feeds = feedRepository.findByIdIn(feedIds);
 
+        Set<Long> authorIds = feeds.stream()
+                .map(Feed::getAuthorId)
+                .collect(java.util.stream.Collectors.toSet());
+
+        Set<Long> followingIds = findFollowingIds(viewerId, authorIds);
+
         return feeds.stream()
-                .map(feed -> feedMapper.toResponse(feed, mediaUrlResolver))
+                .map(f -> feedMapper.toResponse(
+                        f,
+                        mediaUrlResolver,
+                        isFollowing(viewerId, f.getAuthorId(), followingIds)
+                ))
                 .toList();
     }
 
@@ -772,5 +806,18 @@ public class FeedService {
 
         PresignedPutObjectRequest presigned = s3Presigner.presignPutObject(presign);
         return presigned.url().toString();
+    }
+
+    // 유저 프로필에서 팔로우 중인지에 대한 여부를 반환해주기 위해서 추가
+    private boolean isFollowing(Long viewerId, Long authorId, Set<Long> followingIds) {
+        return viewerId != null
+                && authorId != null
+                && !authorId.equals(viewerId)
+                && followingIds.contains(authorId);
+    }
+
+    private Set<Long> findFollowingIds(Long viewerId, Collection<Long> authorIds) {
+        if (viewerId == null || authorIds == null || authorIds.isEmpty()) return Set.of();
+        return userFollowRepository.findFollowingIdsIn(viewerId, authorIds);
     }
 }
