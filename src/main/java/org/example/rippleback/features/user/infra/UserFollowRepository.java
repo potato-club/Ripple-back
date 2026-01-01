@@ -1,7 +1,5 @@
 package org.example.rippleback.features.user.infra;
 
-import org.example.rippleback.features.user.api.dto.PageCursorResponse;
-import org.example.rippleback.features.user.api.dto.UserSummaryDto;
 import org.example.rippleback.features.user.domain.UserFollow;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -11,7 +9,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 @Repository
 public interface UserFollowRepository extends JpaRepository<UserFollow, Long> {
@@ -55,4 +55,14 @@ public interface UserFollowRepository extends JpaRepository<UserFollow, Long> {
             @Param("cursorId") Long cursorId,
             Pageable pageable
     );
+
+    // 검색할 때 유저들 팔로우 여부 확인하기 위해 한번에 확인하기 위한 메서드
+    @Query("""
+    select uf.followingId
+    from UserFollow uf
+    where uf.followerId = :viewerId
+      and uf.followingId in :targetIds
+""")
+    Set<Long> findFollowingIdsIn(@Param("viewerId") Long viewerId,
+                                 @Param("targetIds") Collection<Long> targetIds);
 }
