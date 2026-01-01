@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.example.rippleback.core.security.jwt.JwtPrincipal;
 import org.example.rippleback.features.comment.api.dto.*;
 import org.example.rippleback.features.comment.app.CommentService;
 import org.example.rippleback.features.comment.domain.CommentSortType;
@@ -52,10 +53,10 @@ public class CommentController {
             @Parameter(description = "피드 ID", required = true, example = "123")
             @PathVariable Long feedId,
             @Valid @RequestBody CommentCreateRequestDto request,
-            @Parameter(hidden = true) @AuthenticationPrincipal Long meId
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal p
     ) {
         return commentService.create(
-                meId,
+                p.userId(),
                 feedId,
                 request.parentId(),
                 request.content()
@@ -77,9 +78,9 @@ public class CommentController {
     public void deleteComment(
             @Parameter(description = "댓글 ID", required = true, example = "987")
             @PathVariable Long commentId,
-            @Parameter(hidden = true) @AuthenticationPrincipal Long meId
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal p
     ) {
-        commentService.delete(meId, commentId);
+        commentService.delete(p.userId(), commentId);
     }
 
     @Operation(
@@ -97,9 +98,9 @@ public class CommentController {
     public void likeComment(
             @Parameter(description = "댓글 ID", required = true, example = "987")
             @PathVariable Long commentId,
-            @Parameter(hidden = true) @AuthenticationPrincipal Long meId
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal p
     ) {
-        commentService.like(meId, commentId);
+        commentService.like(p.userId(), commentId);
     }
 
     @Operation(
@@ -117,9 +118,9 @@ public class CommentController {
     public void unlikeComment(
             @Parameter(description = "댓글 ID", required = true, example = "987")
             @PathVariable Long commentId,
-            @Parameter(hidden = true) @AuthenticationPrincipal Long meId
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal p
     ) {
-        commentService.unlike(meId, commentId);
+        commentService.unlike(p.userId(), commentId);
     }
 
     @Operation(
@@ -148,11 +149,11 @@ public class CommentController {
             @Parameter(description = "댓글 ID", required = true, example = "987")
             @PathVariable Long commentId,
             @Valid @RequestBody CommentReportRequestDto request,
-            @Parameter(hidden = true) @AuthenticationPrincipal Long meId
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal p
     ) {
         return CommentReportResponseDto.from(
                 commentService.report(
-                        meId,
+                        p.userId(),
                         commentId,
                         request.category(),
                         request.reason()
@@ -184,13 +185,13 @@ public class CommentController {
             @Parameter(description = "피드 ID", required = true, example = "123")
             @PathVariable Long feedId,
             @Valid CommentPageRequestDto request,
-            @Parameter(hidden = true) @AuthenticationPrincipal Long meId
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal p
     ) {
         int size = (request.size() == null || request.size() <= 0) ? 10 : request.size();
         var sort = request.sort() == null ? CommentSortType.LATEST : request.sort();
 
         return commentService.getRootComments(
-                meId,
+                p.userId(),
                 feedId,
                 request.cursorId(),
                 size,
@@ -223,13 +224,13 @@ public class CommentController {
             @Parameter(description = "루트 댓글 ID", required = true, example = "987")
             @PathVariable Long commentId,
             @Valid CommentPageRequestDto request,
-            @Parameter(hidden = true) @AuthenticationPrincipal Long meId
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal p
     ) {
         int size = (request.size() == null || request.size() <= 0) ? 10 : request.size();
         var sort = request.sort() == null ? CommentSortType.LATEST : request.sort();
 
         return commentService.getReplies(
-                meId,
+                p.userId(),
                 feedId,
                 commentId,
                 request.cursorId(),
