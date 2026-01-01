@@ -84,8 +84,20 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
             Pageable pageable
     );
 
+    boolean existsByRootCommentIdAndVisibility(Long rootCommentId, CommentVisibility visibility);
 
-    boolean existsByRootCommentIdAndVisibility(Long rootCommentId,
-                                               CommentVisibility visibility);
+    // 다른 사용자가 유저 프로필에 접근했을 때 그 사용자에게 보여줄 수 있는 댓글 최신순으로 찾기
+    @Query("""
+    select c
+    from Comment c
+    join c.feed f
+    where c.authorId = :authorId
+      and c.status = org.example.rippleback.features.comment.domain.CommentStatus.PUBLISHED
+      and c.visibility = org.example.rippleback.features.comment.domain.CommentVisibility.VISIBLE
+      and f.status = org.example.rippleback.features.feed.domain.FeedStatus.PUBLISHED
+      and f.visibility = org.example.rippleback.features.feed.domain.FeedVisibility.PUBLIC
+    order by c.id desc
+""")
+    List<Comment> findLatestVisiblePublicByAuthorId(@Param("authorId") Long authorId, Pageable pageable);
 
 }

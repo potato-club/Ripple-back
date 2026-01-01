@@ -345,6 +345,22 @@ public class CommentService {
         return new CommentPageResponseDto(dtos, nextCursor, hasNext);
     }
 
+    // 유저 프로필 페이지에서 보여줄 댓글 검색할 메서드
+    @Transactional(readOnly = true)
+    public List<CommentResponseDto> getLatestByAuthor(Long authorId, int size) {
+        int limit = Math.max(1, Math.min(size, 50));
+        var page = PageRequest.of(0, limit);
+
+        var comments = commentRepo.findLatestVisiblePublicByAuthorId(authorId, page);
+
+        var author = userRepo.findById(authorId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        var authorSummary = userMapper.toSummary(author);
+
+        return comments.stream()
+                .map(c -> CommentResponseDto.from(c, authorSummary))
+                .toList();
+    }
 
     private void assertFeedVisibleToMeOr404(Feed feed, Long userId) {
         if (feed.getStatus() != FeedStatus.PUBLISHED) {

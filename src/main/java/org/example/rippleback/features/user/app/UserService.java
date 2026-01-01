@@ -98,14 +98,18 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public UserResponseDto getProfileById(Long id) {
-        User u = userRepository.findById(id).orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        User u = userRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
         if (u.getStatus() != UserStatus.ACTIVE) throw new BusinessException(ErrorCode.USER_NOT_FOUND);
 
         long posts = feedRepo.countByAuthorIdAndStatus(id, FeedStatus.PUBLISHED);
         long followers = userFollowRepo.countByFollowingId(id);
         long followings = userFollowRepo.countByFollowerId(id);
 
-        return userMapper.toProfile(u, posts, followers, followings);
+        var latestFeeds = feedService.getLatestByAuthor(id);
+
+        return userMapper.toProfile(u, posts, followers, followings, latestFeeds);
     }
 
     @Transactional(readOnly = true)
@@ -118,8 +122,9 @@ public class UserService {
         long posts = feedRepo.countByAuthorIdAndStatus(id, FeedStatus.PUBLISHED);
         long followers = userFollowRepo.countByFollowingId(id);
         long followings = userFollowRepo.countByFollowerId(id);
+        var latestFeeds = feedService.getLatestByAuthor(id);
 
-        return userMapper.toProfile(u, posts, followers, followings);
+        return userMapper.toProfile(u, posts, followers, followings, latestFeeds);
     }
 
     @Transactional(readOnly = true)
@@ -210,8 +215,9 @@ public class UserService {
         long posts = feedRepo.countByAuthorIdAndStatus(meId, FeedStatus.PUBLISHED);
         long followers = userFollowRepo.countByFollowingId(meId);
         long followings = userFollowRepo.countByFollowerId(meId);
+        var latestFeeds = feedService.getLatestByAuthor(meId);
 
-        return userMapper.toProfile(me, posts, followers, followings);
+        return userMapper.toProfile(me, posts, followers, followings, latestFeeds);
     }
 
 

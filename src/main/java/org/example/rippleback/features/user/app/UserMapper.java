@@ -1,6 +1,7 @@
 package org.example.rippleback.features.user.app;
 
 import lombok.RequiredArgsConstructor;
+import org.example.rippleback.features.feed.api.dto.FeedResponseDto;
 import org.example.rippleback.features.media.app.MediaUrlResolver;
 import org.example.rippleback.features.user.api.dto.MeResponseDto;
 import org.example.rippleback.features.user.api.dto.SignupResponseDto;
@@ -9,6 +10,8 @@ import org.example.rippleback.features.user.api.dto.UserSummaryDto;
 import org.example.rippleback.features.user.domain.User;
 import org.example.rippleback.features.user.domain.UserStatus;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -36,14 +39,20 @@ public class UserMapper {
     }
 
     // 디테일한 프로필 매핑
-    public UserResponseDto toProfile(User u, long postCnt, long followerCnt, long followingCnt) {
+    public UserResponseDto toProfile(User u,
+                                     long postCnt,
+                                     long followerCnt,
+                                     long followingCnt,
+                                     List<FeedResponseDto> latestFeeds
+    ) {
         return new UserResponseDto(
                 u.getId(),
                 u.getUsername(),
                 profileImageUrlOf(u),
                 postCnt,
                 followerCnt,
-                followingCnt
+                followingCnt,
+                latestFeeds
         );
     }
 

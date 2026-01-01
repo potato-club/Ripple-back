@@ -116,4 +116,15 @@ public interface FeedRepository extends JpaRepository<Feed, Long> {
             and f.commentCount > 0
             """)
     int decrementCommentCount(@Param("feedId") Long feedId);
+
+    // 유저 프로필 페이지에서 사용하기 위함.
+    @EntityGraph(attributePaths = {"author", "author.profileMedia", "thumbnailMedia"})
+    @Query("""
+    select f
+    from Feed f
+    where f.status = 'PUBLISHED'
+      and f.authorId = :authorId
+    order by f.id desc
+""")
+    List<Feed> findLatestPublishedByAuthorId(@Param("authorId") Long authorId, Pageable pageable);
 }

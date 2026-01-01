@@ -474,6 +474,19 @@ public class FeedService {
         );
     }
 
+    // 유저 프로필 페이지에서 가장 최근 제작한 피드 보여주기에 사용하는 메서드 (최소 0, 최대 4)
+    @Transactional(readOnly = true)
+    public List<FeedResponseDto> getLatestByAuthor(Long authorId) {
+        final int limit = 4; // 프로필 페이지: 최대 4개 고정
+        var page = PageRequest.of(0, limit);
+
+        var feeds = feedRepository.findLatestPublishedByAuthorId(authorId, page);
+
+        return feeds.stream()
+                .map(f -> feedMapper.toResponse(f, mediaUrlResolver))
+                .toList();
+    }
+
     /**
      * FullView:
      * - MediaType으로 이미지/비디오 분기
