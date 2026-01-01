@@ -14,7 +14,7 @@ public class FeedMapper {
 
     private final UserMapper userMapper;
 
-    public FeedResponseDto toResponse(Feed feed, MediaUrlResolver resolver) {
+    public FeedResponseDto toResponse(Feed feed, MediaUrlResolver resolver, boolean isFollow) {
         String thumbnailUrl = null;
 
         Media tm = feed.getThumbnailMedia();
@@ -27,7 +27,7 @@ public class FeedMapper {
 
         return new FeedResponseDto(
                 feed.getId(),
-                userMapper.toSummary(feed.getAuthor()),
+                userMapper.toSummary(feed.getAuthor(), isFollow),
                 feed.getContent(),
                 feed.getTagsNorm(),
                 feed.getLikeCount(),

@@ -1,5 +1,6 @@
 package org.example.rippleback.features.feed.api;
 
+import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.rippleback.common.dto.ApiResponse;
@@ -129,7 +130,9 @@ public class FeedController {
     }
 
     @GetMapping("/tag/{tagName}")
-    public List<FeedResponseDto> getFeedsByTag(@PathVariable String tagName) {
-        return feedService.getFeedsByTag(tagName);
+    public List<FeedResponseDto> getFeedsByTag(@Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal p,
+                                               @PathVariable String tagName
+    ) {
+        return feedService.getFeedsByTag(p.userId(), tagName);
     }
 }
